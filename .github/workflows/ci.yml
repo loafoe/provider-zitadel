@@ -246,22 +246,35 @@ jobs:
           name: output
           path: _output/**
 
-      # A GITHUB_TOKEN may only push to a GHCR package associated with this
-      # repository. `make publish` establishes the association with the labelled
-      # controller image it pushes first. If the package already exists and was
-      # created outside of this repository, the association is missing and the
-      # push is rejected with 403; that is a one time fix, see the README.
+      # A GITHUB_TOKEN may only push to a GHCR package that is associated with
+      # this repository. `make publish` establishes that association by pushing
+      # the labelled controller image first, but it cannot do so if the package
+      # already exists and was created from somewhere else - the token is
+      # refused before the label is ever looked at.
       #
-      # Branch builds are deliberately NOT signed: a cluster with package
+      # That is a one time owner action, and a branch build is not the place to
+      # enforce it: the publish is allowed to fail here and the run says so. A
+      # release is the thing that must actually reach the registry, so
+      # release.yml keeps this step strict.
+      #
+      # Branch builds are also deliberately NOT signed: a cluster with package
       # signature verification enabled must install a release tag, which
-      # .github/workflows/release.yml signs. Signing here as well would let a
-      # mutable branch ref stand in for a release.
+      # release.yml signs. Signing here as well would let a mutable branch ref
+      # stand in for a release.
       - name: Publish Artifacts to GHCR
+        id: publish
+        continue-on-error: true
         run: make publish BRANCH_NAME=${GITHUB_REF##*/}
         env:
           XPKG_REG_ORGS: ghcr.io/${{ github.repository_owner }}
 
+      - name: Report a failed publish
+        if: steps.publish.outcome == 'failure'
+        run: |
+          echo "::warning title=Package not published::The package ghcr.io/${{ github.repository_owner }}/provider-zitadel could not be published from this workflow. This is expected until the package is associated with this repository: delete it at https://github.com/packages?package_type=container and let the next run recreate it. The Release workflow is strict about this, so a tagged release will fail loudly until then."
+
       - name: Verify the published package is a multi-arch image index
+        if: steps.publish.outcome == 'success'
         run: |
           set -euo pipefail
           org="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"

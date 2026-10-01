@@ -290,15 +290,18 @@ which `make publish` does first by publishing the labelled controller image.
 
 If the package already exists but was created outside of this repository (for
 example pushed from a laptop with a personal token), the association is missing
-and every CI push fails with `403 Forbidden` on the existing blobs. Fix it once,
-either way:
+and the token is refused with `denied: permission_denied: read_package` before
+the label is ever looked at. The fix is one action, in
+[GitHub's package settings](https://github.com/packages?package_type=container):
 
-* make the package public in
-  [GitHub's package settings](https://github.com/packages?package_type=container),
-  or
-* delete it there, and let the next CI run recreate it — which links it to the
-  repository and, because this account defaults to public package visibility,
-  makes it public in one go.
+* **delete `provider-zitadel`**, and let the next CI run recreate it. The first
+  push from the repository associates the package with it and, because this
+  account defaults to public package visibility, makes it public in one go.
+
+While the package is in that state, `ci.yml` reports the failed publish as a
+warning annotation and the run stays green — a branch build is not the place to
+enforce a one time owner action. `release.yml` keeps the step strict, so a tagged
+release fails loudly until the package is set up.
 
 Branch builds pushed by `ci.yml` are deliberately **not** signed. A cluster with
 package signature verification enabled must install a `v*` tag, and signing a
