@@ -16,15 +16,23 @@ img.build:
 	@$(MAKE) BUILD_ARGS="--load" img.build.shared
 	@$(OK) docker build $(IMAGE)
 
-# The provider is shipped as a self contained, multi-arch Crossplane package: the
-# xpkg embeds the controller image of every platform it was built for, and the
-# published OCI image is an image index covering all of them. We still publish
-# the standalone multi-arch controller image so that the provider can also be run
-# outside of Crossplane (e.g. out of cluster against a kubeconfig).
+# The controller image is not published on its own.
+#
+# A Crossplane v2 provider package embeds its controller image: the xpkg is
+# built with `--embed-runtime-image` and the package image doubles as the
+# runtime image, so `spec.controller.image` stays empty. The published
+# `ghcr.io/loafoe/provider-zitadel:<tag>` reference is therefore the multi-arch
+# *package* index - publishing the controller image under the same tag would
+# overwrite the package.
+#
+# The per-platform controller images are still built here (that is what
+# `--embed-runtime-image` reads from the local daemon) and they are always
+# multi-arch in the sense that matters: the package index carries one
+# controller image per platform.
 img.publish:
-	@$(INFO) Publishing multi-arch image $(IMAGE)
-	@$(MAKE) BUILD_ARGS="--push" img.build.shared
-	@$(OK) Published multi-arch image $(IMAGE)
+	@$(INFO) Skipping image publish for $(IMAGE)
+	@echo The controller image is embedded in the Crossplane package, which is published as $(IMAGE) by the xpkg machinery.
+	@$(OK) Image publish skipped
 
 img.build.shared:
 	@cp Dockerfile $(IMAGE_TEMP_DIR) || $(FAIL)
@@ -35,6 +43,6 @@ img.build.shared:
 		$(IMAGE_TEMP_DIR) || $(FAIL)
 
 img.promote:
-	@$(INFO) Promoting multi-arch image from $(FROM_IMAGE) to $(TO_IMAGE)
-	@docker buildx imagetools create -t $(TO_IMAGE) $(FROM_IMAGE) || $(FAIL)
-	@$(OK) Promoted multi-arch image from $(FROM_IMAGE) to $(TO_IMAGE)
+	@$(INFO) Skipping image promotion for $(IMAGE)
+	@echo The controller image is embedded in the Crossplane package, which is promoted by the xpkg machinery.
+	@$(OK) Image promotion skipped

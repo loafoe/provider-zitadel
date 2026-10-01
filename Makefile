@@ -3,9 +3,15 @@
 PROJECT_NAME := provider-zitadel
 PROJECT_REPO := github.com/loafoe/$(PROJECT_NAME)
 
-# The provider OCI image is always published as a multi-arch image index.
+# The provider package is always published as a multi-arch image index.
 PLATFORMS ?= linux_amd64 linux_arm64
 -include build/makelib/common.mk
+
+# The build submodule only publishes artifacts when BRANCH_NAME matches
+# RELEASE_BRANCH_FILTER, which by default only lists branches. This provider
+# also releases from version tags, so the filter has to match v* too -
+# otherwise `make publish` on a tag-triggered release silently does nothing.
+RELEASE_BRANCH_FILTER ?= main master release-% v%
 
 # ====================================================================================
 # Setup Output
@@ -42,17 +48,39 @@ test.run: go.test.unit.fixed
 # ====================================================================================
 # Setup Images
 
+# The controller images are built per platform (the xpkg embeds them) but never
+# published on their own: a Crossplane v2 package doubles as its own runtime
+# image, so a standalone image under the same tag would overwrite the package.
+# XPKG_REG_ORGS below is what actually gets pushed.
 IMAGES = provider-zitadel
-REGISTRY_ORGS ?= ghcr.io/loafoe
+REGISTRY_ORGS ?=
 -include build/makelib/imagelight.mk
+
+# ====================================================================================
+# Setup Cosign
+
+# COSIGN_VERSION is the cosign version used by the `cosign` targets. CI pins the
+# same version via sigstore/cosign-installer.
+COSIGN_VERSION ?= 2.6.1
+COSIGN := $(TOOLS_HOST_DIR)/cosign-v$(COSIGN_VERSION)
+
+# The keyless identity of the release workflow. This is what ends up in the
+# Fulcio certificate of the signature, and what Crossplane matches on through
+# examples/imageconfig-signature-verification.yaml.
+GITHUB_REPO := $(shell git config --get remote.origin.url | sed -E 's|^git@github.com[:/]||; s|^https://github.com/||; s|\.git$$||')
+GITHUB_OWNER := $(word 1,$(subst /, ,$(GITHUB_REPO)))
+COSIGN_CERT_IDENTITY ?= https://github.com/$(GITHUB_REPO)/.github/workflows/release.yml@refs/tags/$(VERSION)
+COSIGN_CERT_ISSUER ?= https://token.actions.githubusercontent.com
+COSIGN_OCI_REPO ?= ghcr.io/$(GITHUB_OWNER)/$(PROJECT_NAME)
 
 # ====================================================================================
 # Setup XPKG
 
 XPKG_REG_ORGS ?= ghcr.io/loafoe
-# NOTE(hasheddan): skip promoting on xpkg.upbound.io as channel tags are
-# inferred.
-XPKG_REG_ORGS_NO_PROMOTE ?= ghcr.io/loafoe
+# Channel tags (":stable") only exist on registries that do not infer vanity
+# tags from the tag, so nothing is excluded here. Leaving this empty matters:
+# a stale value silently turns `make promote` into a no-op.
+XPKG_REG_ORGS_NO_PROMOTE ?=
 XPKGS = provider-zitadel
 -include build/makelib/xpkg.mk
 
@@ -122,6 +150,37 @@ dev-clean: $(KIND) $(KUBECTL)
 
 # ====================================================================================
 # Special Targets
+
+# Sign the published package with a keyless cosign signature, exactly like the
+# release workflow does. Requires a GitHub OIDC token, so it only works inside
+# GitHub Actions (or with COSIGN_EXPERIMENTAL and a suitable ambient token).
+sign:
+	@[ "${VERSION}" ] || ( echo "argument \"VERSION\" is not set, e.g. make sign VERSION=v0.1.0"; exit 1 )
+	@$(INFO) cosign sign $(COSIGN_OCI_REPO):$(VERSION)
+	@cosign sign --yes \
+		--certificate-identity "$(COSIGN_CERT_IDENTITY)" \
+		--certificate-oidc-issuer "$(COSIGN_CERT_ISSUER)" \
+		$(COSIGN_OCI_REPO):$(VERSION)
+	@$(OK) signed $(COSIGN_OCI_REPO):$(VERSION)
+
+# Verify the signature of a published package the way a consumer would.
+verify-signature:
+	@[ "${VERSION}" ] || ( echo "argument \"VERSION\" is not set, e.g. make verify-signature VERSION=v0.1.0"; exit 1 )
+	@$(INFO) cosign verify $(COSIGN_OCI_REPO):$(VERSION)
+	@cosign verify \
+		--certificate-identity-regexp '^https://github\.com/$(GITHUB_OWNER)/$(PROJECT_NAME)/\.github/workflows/release\.yml@refs/tags/$(VERSION)$$' \
+		--certificate-oidc-issuer "$(COSIGN_CERT_ISSUER)" \
+		$(COSIGN_OCI_REPO):$(VERSION)
+	@$(OK) signature of $(COSIGN_OCI_REPO):$(VERSION) is valid
+
+$(COSIGN):
+	@$(INFO) installing cosign-v$(COSIGN_VERSION) $(SAFEHOSTPLATFORM)
+	@mkdir -p $(TOOLS_HOST_DIR)
+	@curl -fsSLo $(TOOLS_HOST_DIR)/cosign.tgz "https://github.com/sigstore/cosign/releases/download/v$(COSIGN_VERSION)/cosign-linux-amd64.tgz" || $(FAIL)
+	@tar -xzf $(TOOLS_HOST_DIR)/cosign.tgz -C $(TOOLS_HOST_DIR) cosign || $(FAIL)
+	@mv $(TOOLS_HOST_DIR)/cosign $(COSIGN) || $(FAIL)
+	@rm -fr $(TOOLS_HOST_DIR)/cosign.tgz
+	@$(OK) installing cosign-v$(COSIGN_VERSION) $(SAFEHOSTPLATFORM)
 
 # Install gomplate
 GOMPLATE_VERSION := 3.10.0

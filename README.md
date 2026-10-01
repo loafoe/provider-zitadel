@@ -222,20 +222,78 @@ A few Zitadel specifics the provider works around:
 
 ## Installing
 
-```console
-kubectl apply -f https://raw.githubusercontent.com/loafoe/provider-zitadel/main/package/crds
-```
-
-or as a Crossplane package:
+As a Crossplane v2 package:
 
 ```console
 crossplane xpkg install provider ghcr.io/loafoe/provider-zitadel:v0.1.0
 ```
 
-The published image is a multi-arch OCI index covering `linux/amd64` and
-`linux/arm64`; the Crossplane package embeds the controller image for every
-platform it was built for. CI verifies both platforms after publishing and fails
-the build if either is missing.
+Or, without the Crossplane package machinery, apply just the CRDs:
+
+```console
+kubectl apply -f https://raw.githubusercontent.com/loafoe/provider-zitadel/main/package/crds
+```
+
+## Releases, signing and multi-arch
+
+Pushing a `v*` tag runs
+[`.github/workflows/release.yml`](./.github/workflows/release.yml), which:
+
+1. runs `make reviewable` and `make build.all` — every platform is built and the
+   multi-arch package is assembled;
+2. publishes the package to `ghcr.io/loafoe/provider-zitadel:<tag>` as a
+   **multi-arch OCI image index** covering `linux/amd64` and `linux/arm64`;
+3. signs the image index with a **keyless cosign signature** (Fulcio
+   certificate + Rekor transparency log entry) using the GitHub Actions OIDC
+   identity, and emits a SLSA provenance attestation;
+4. verifies the signature, verifies that both platforms are present, and finally
+   promotes the release to the `:stable` channel and signs that too.
+
+A second job then re-verifies the published signature from scratch, using only
+the workflow identity — i.e. it proves a consumer can verify the package without
+any repository-local knowledge.
+
+Verify a release yourself:
+
+```console
+cosign verify \
+  --certificate-identity-regexp '^https://github\.com/loafoe/provider-zitadel/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  ghcr.io/loafoe/provider-zitadel:v0.1.0
+```
+
+or `make verify-signature VERSION=v0.1.0`.
+
+### The package is the runtime image
+
+A Crossplane v2 provider package embeds its controller image: the xpkg is built
+with `--embed-runtime-image`, so `spec.controller.image` stays empty and the
+package image doubles as the runtime image. That is why only the package is
+published — pushing a standalone controller image under the same tag would
+overwrite the package. The multi-arch property is preserved end to end: the
+package index has one entry per platform, each embedding that platform's
+controller image.
+
+### Enforcing signature verification in a cluster
+
+Crossplane can refuse to install a package that is not signed by a trusted
+authority. It is an alpha feature, so it has to be switched on first:
+
+```console
+crossplane core start --enable-signature-verification
+```
+
+Then apply the shipped `ImageConfig`, which pins this repository's release
+workflow as the only accepted signer:
+
+```console
+kubectl apply -f examples/imageconfig-signature-verification.yaml
+crossplane xpkg install provider ghcr.io/loafoe/provider-zitadel:v0.1.0
+```
+
+Note that only release tags are signed. Branch builds pushed by CI are
+deliberately unsigned, so a cluster with verification enabled must install a
+`v*` tag.
 
 ## Developing
 

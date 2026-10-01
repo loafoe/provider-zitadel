@@ -1,0 +1,49 @@
+# Package signature verification for provider-zitadel.
+#
+# Crossplane v2 verifies Crossplane packages with a cosign validator that is
+# driven by an ImageConfig in the crossplane-system namespace. It is an alpha
+# feature, so Crossplane has to be started with it enabled:
+#
+#   crossplane core start --enable-signature-verification
+#
+# or, for the Helm chart:
+#
+#   helm upgrade --install crossplane crossplane-stable/crossplane \
+#     --namespace crossplane-system \
+#     --reuse-values \
+#     --set 'args={core,start,--enable-signature-verification}'
+#
+# The flag is alpha and exists from Crossplane v2.1.0. `crossplane core start
+# --help` lists it under "Alpha Features" as
+# --enable-signature-verification.
+#
+# Once that is in place, Crossplane refuses to install any package that is not
+# signed by one of the authorities below. That is the point: the ImageConfig
+# turns "trust this registry" into "trust this release workflow".
+#
+# The keyless authority matches the Fulcio certificate that `cosign sign`
+# produced in .github/workflows/release.yml. The Fulcio root certificate is
+# trusted by the Crossplane image itself, so only the identity has to be
+# configured here.
+---
+apiVersion: pkg.crossplane.io/v1beta1
+kind: ImageConfig
+metadata:
+  name: provider-zitadel
+  namespace: crossplane-system
+spec:
+  matchImages:
+    # Longest prefix wins, so keep this specific to this repository.
+    - type: Prefix
+      prefix: ghcr.io/loafoe/provider-zitadel
+  verification:
+    provider: Cosign
+    cosign:
+      authorities:
+        # The release workflow of this repository, for any version tag.
+        - name: provider-zitadel release workflow
+          keyless:
+            insecureIgnoreSCT: false
+            identities:
+              - issuer: https://token.actions.githubusercontent.com
+                subjectRegExp: ^https://github\.com/loafoe/provider-zitadel/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$

@@ -51,9 +51,9 @@ jobs:
           VERSION: ${{ github.event.inputs.version }}
           CHANNEL: ${{ github.event.inputs.channel }}
           XPKG_REG_ORGS: ghcr.io/${{ github.repository_owner }}
-          REGISTRY_ORGS: ghcr.io/${{ github.repository_owner }}
+          REGISTRY_ORGS: ""
 
-      - name: Verify the promoted images are multi-arch
+      - name: Verify the promoted package is a multi-arch image index
         run: |
           set -euo pipefail
           org="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"

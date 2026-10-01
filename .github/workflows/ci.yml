@@ -246,24 +246,27 @@ jobs:
           name: output
           path: _output/**
 
+      # Branch builds are deliberately NOT signed: a cluster with package
+      # signature verification enabled must install a release tag, which
+      # .github/workflows/release.yml signs. Signing here as well would let a
+      # mutable branch ref stand in for a release.
       - name: Publish Artifacts to GHCR
         run: make publish BRANCH_NAME=${GITHUB_REF##*/}
         env:
           XPKG_REG_ORGS: ghcr.io/${{ github.repository_owner }}
+          REGISTRY_ORGS: ""
 
-      - name: Verify the published images are multi-arch
+      - name: Verify the published package is a multi-arch image index
         run: |
           set -euo pipefail
           org="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
-          tag="${GITHUB_REF##*/}"
-          for image in "ghcr.io/${org}/provider-zitadel:${tag}" "ghcr.io/${org}/provider-zitadel:v${tag}"; do
-            echo "==> ${image}"
-            platforms="$(docker buildx imagetools inspect "${image}" --format '{{range .Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
-            echo "${platforms}"
-            for p in linux/amd64 linux/arm64; do
-              case "${platforms}" in
-                *"${p}"*) ;;
-                *) echo "::error::${image} is missing the ${p} platform"; exit 1 ;;
-              esac
-            done
+          image="ghcr.io/${org}/provider-zitadel:${GITHUB_REF##*/}"
+          echo "==> ${image}"
+          platforms="$(docker buildx imagetools inspect "${image}" --format '{{range .Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
+          echo "${platforms}"
+          for p in linux/amd64 linux/arm64; do
+            case "${platforms}" in
+              *"${p}"*) ;;
+              *) echo "::error::${image} is missing the ${p} platform"; exit 1 ;;
+            esac
           done

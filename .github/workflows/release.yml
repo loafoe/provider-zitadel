@@ -5,20 +5,39 @@ on:
     tags:
       - 'v*'
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   GO_VERSION: '1.27'
   DOCKER_BUILDX_VERSION: 'v0.23.0'
+  COSIGN_VERSION: 'v2.6.1'
+  CROSSPLANE_CLI_VERSION: 'v2.1.3'
+  CRANE_VERSION: 'v0.20.6'
+  IMAGE: ghcr.io/${{ github.repository_owner }}/provider-zitadel
 
 jobs:
-  build-and-push:
+  # Builds the multi-arch Crossplane package (each platform's xpkg embeds its own
+  # controller image), publishes it, signs it with a keyless cosign signature,
+  # emits SLSA provenance, and finally promotes it to the stable channel.
+  publish:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
+      # Push the package index to GHCR.
       packages: write
+      # Keyless cosign signing and artifact attestations both need an OIDC token.
+      id-token: write
+      attestations: write
+
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      digest: ${{ steps.meta.outputs.digest }}
 
     steps:
       # QEMU is what makes the linux/arm64 image buildable on the runner. The
-      # provider image is always published as a multi-arch image index covering
+      # package is always published as a multi-arch image index covering
       # linux/amd64 and linux/arm64.
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v3
@@ -30,6 +49,29 @@ jobs:
         with:
           version: ${{ env.DOCKER_BUILDX_VERSION }}
           install: true
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: ${{ env.COSIGN_VERSION }}
+
+      # crane is how the workflow resolves a tag to the immutable digest it
+      # signs. It is not preinstalled on the runner.
+      - name: Install crane
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin crane
+          crane version
+
+      - name: Install the Crossplane CLI
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          curl -fsSL "https://releases.crossplane.io/stable/${CROSSPLANE_CLI_VERSION}/crossplane-cli_linux_amd64.tar.gz" -o "${tmp}/crossplane.tgz"
+          tar -xzf "${tmp}/crossplane.tgz" -C "${tmp}" crossplane
+          sudo mv "${tmp}/crossplane" /usr/local/bin/crossplane
+          crossplane version
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -72,8 +114,8 @@ jobs:
       - name: Download Go Modules
         run: make modules.download modules.check
 
-      - name: Run Unit Tests
-        run: make -j2 test
+      - name: Review the change
+        run: make -j2 reviewable
 
       - name: Build Artifacts
         run: make -j2 build.all
@@ -85,22 +127,68 @@ jobs:
         env:
           VERSION: ${{ github.ref_name }}
           XPKG_REG_ORGS: ghcr.io/${{ github.repository_owner }}
-          REGISTRY_ORGS: ghcr.io/${{ github.repository_owner }}
+          REGISTRY_ORGS: ""
 
-      - name: Verify the published images are multi-arch
+      - name: Resolve and record the package digest
+        id: meta
         run: |
           set -euo pipefail
-          org="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
-          for image in "ghcr.io/${org}/provider-zitadel:${GITHUB_REF_NAME}" "ghcr.io/${org}/provider-zitadel:${GITHUB_REF_NAME}-linux_amd64"; do
-            echo "==> ${image}"
-            platforms="$(docker buildx imagetools inspect "${image}" --format '{{range .Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
-            echo "${platforms}"
-            for p in linux/amd64 linux/arm64; do
-              case "${platforms}" in
-                *"${p}"*) ;;
-                *) echo "::error::${image} is missing the ${p} platform"; exit 1 ;;
-              esac
-            done
+          digest="$(crane digest "${IMAGE}@${GITHUB_REF_NAME}")"
+          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### provider-zitadel ${GITHUB_REF_NAME}"
+            echo
+            echo "Install with:"
+            echo
+            echo '```console'
+            echo "crossplane xpkg install provider ${IMAGE}:${GITHUB_REF_NAME}"
+            echo '```'
+            echo
+            echo "or with package signature verification enabled:"
+            echo
+            echo '```console'
+            echo "kubectl apply -f examples/imageconfig-signature-verification.yaml"
+            echo "crossplane xpkg install provider ${IMAGE}:${GITHUB_REF_NAME}"
+            echo '```'
+            echo
+            echo "Digest: \`${digest}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Sign the image index, not the tag: a signature has to cover the exact
+      # bytes a consumer pulls. This is the signature Crossplane itself checks
+      # when package signature verification is enabled.
+      - name: Sign the package (keyless)
+        run: |
+          set -euo pipefail
+          cosign sign --yes "${IMAGE}@${{ steps.meta.outputs.digest }}"
+
+      - name: Attest the build provenance
+        run: |
+          set -euo pipefail
+          cosign attest --yes --type slsaprovenance \
+            "${IMAGE}@${{ steps.meta.outputs.digest }}"
+
+      - name: Verify the signature
+        env:
+          CERT_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/release.yml@refs/tags/${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          cosign verify \
+            --certificate-identity "${CERT_IDENTITY}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${IMAGE}@${{ steps.meta.outputs.digest }}"
+
+      - name: Verify the package is a multi-arch image index
+        run: |
+          set -euo pipefail
+          platforms="$(docker buildx imagetools inspect "${IMAGE}:${GITHUB_REF_NAME}" --format '{{range .Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
+          echo "${platforms}"
+          for p in linux/amd64 linux/arm64; do
+            case "${platforms}" in
+              *"${p}"*) ;;
+              *) echo "::error::${IMAGE}:${GITHUB_REF_NAME} is missing the ${p} platform"; exit 1 ;;
+            esac
           done
 
       - name: Promote to the stable channel
@@ -109,4 +197,37 @@ jobs:
           VERSION: ${{ github.ref_name }}
           CHANNEL: stable
           XPKG_REG_ORGS: ghcr.io/${{ github.repository_owner }}
-          REGISTRY_ORGS: ghcr.io/${{ github.repository_owner }}
+          REGISTRY_ORGS: ""
+
+      - name: Sign the stable channel
+        run: |
+          set -euo pipefail
+          cosign sign --yes "${IMAGE}:stable@$(crane digest "${IMAGE}:stable")"
+
+  # Proves that a consumer can verify the published package without any
+  # repository-local knowledge beyond the workflow identity.
+  verify:
+    needs: publish
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: ${{ env.COSIGN_VERSION }}
+
+      - name: Verify the package signature
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/provider-zitadel
+          TAG: ${{ needs.publish.outputs.tag }}
+          DIGEST: ${{ needs.publish.outputs.digest }}
+          CERT_IDENTITY_REGEXP: ^https://github\.com/${{ github.repository_owner }}/provider-zitadel/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$
+        run: |
+          set -euo pipefail
+          echo "Verifying ${IMAGE}@${DIGEST} against ${CERT_IDENTITY_REGEXP}"
+          cosign verify \
+            --certificate-identity-regexp "${CERT_IDENTITY_REGEXP}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${IMAGE}@${DIGEST}"
