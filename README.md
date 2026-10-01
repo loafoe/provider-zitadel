@@ -281,27 +281,49 @@ an image cannot share a tag. The multi-arch property holds end to end: the packa
 index has one entry per platform, each embedding that platform's controller
 image.
 
-### One-time GitHub package setup
+### The GHCR package must belong to the repository
 
 A workflow's `GITHUB_TOKEN` may only push to a GHCR package that is **associated
 with the repository the workflow runs in**. The association is established by the
 `org.opencontainers.image.source` label on an image pushed from that repository,
 which `make publish` does first by publishing the labelled controller image.
 
-If the package already exists but was created outside of this repository (for
-example pushed from a laptop with a personal token), the association is missing
-and the token is refused with `denied: permission_denied: read_package` before
-the label is ever looked at. The fix is one action, in
+If the package exists but was created from somewhere else — for example pushed
+from a laptop with a personal token — the token is refused with
+`denied: permission_denied: read_package` before the label is ever looked at.
+The fix is one action, in
 [GitHub's package settings](https://github.com/packages?package_type=container):
-
-* **delete `provider-zitadel`**, and let the next CI run recreate it. The first
-  push from the repository associates the package with it and, because this
-  account defaults to public package visibility, makes it public in one go.
+**delete `provider-zitadel`**, and let the next run recreate it. The first push
+from the repository associates the package with it and, because this account
+defaults to public package visibility, makes it public in one go.
 
 While the package is in that state, `ci.yml` reports the failed publish as a
 warning annotation and the run stays green — a branch build is not the place to
 enforce a one time owner action. `release.yml` keeps the step strict, so a tagged
 release fails loudly until the package is set up.
+
+### Checking the multi-arch property yourself
+
+Every publish and promote runs `hack/verify-multiarch.sh`, which is also useful
+by hand:
+
+```console
+hack/verify-multiarch.sh ghcr.io/loafoe/provider-zitadel:v0.1.0
+```
+
+```
+==> ghcr.io/loafoe/provider-zitadel:v0.1.0
+    mediaType: application/vnd.oci.image.index.v1+json
+    platforms: linux/amd64, linux/arm64
+All references cover: linux/amd64 linux/arm64
+```
+
+It fails, listing every problem rather than the first, when a reference is not a
+multi-arch index at all, when a platform is missing, or when the reference
+cannot be read. The manifest is parsed with `imagetools inspect --raw` and `jq`
+rather than a buildx `--format` template, because the template context changed
+between buildx versions and an older runner silently fails to resolve
+`.Manifests`.
 
 Branch builds pushed by `ci.yml` are deliberately **not** signed. A cluster with
 package signature verification enabled must install a `v*` tag, and signing a

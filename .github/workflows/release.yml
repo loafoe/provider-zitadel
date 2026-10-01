@@ -136,17 +136,15 @@ jobs:
       # A GITHUB_TOKEN may only push to a GHCR package that is associated with
       # the repository this workflow runs in. The association is established by
       # the org.opencontainers.image.source label on an image pushed from this
-      # repository, which `make publish` does first. If the package already
-      # exists and was created outside of this repository, the association is
-      # missing and every push is rejected with 403 - which is a confusing
-      # failure, so it is called out here.
-      - name: Check that the GHCR package can be pushed to
+      # repository, which `make publish` does first by publishing the labelled
+      # controller image. If the package exists but was created from somewhere
+      # else the token is refused with `denied: permission_denied: read_package`
+      # before the label is ever looked at, so say so up front: a release must
+      # actually reach the registry and this step is deliberately not allowed to
+      # fail softly.
+      - name: Note the GHCR package association
         run: |
-          set -euo pipefail
-          if docker buildx imagetools inspect "${IMAGE}:v0.0.0-canary" >/dev/null 2>&1; then
-            echo "::notice::${IMAGE} already exists."
-          fi
-          echo "::notice::The first push associates ${IMAGE} with ${GITHUB_REPOSITORY}. If it fails with 403 Forbidden, the package was created outside of this repository: make it public, or delete it in https://github.com/packages?package_type=container so the next run recreates it."
+          echo "::notice::Pushing ${IMAGE} associates it with ${GITHUB_REPOSITORY}. If this fails with permission_denied, the package was created outside of this repository: delete it at https://github.com/packages?package_type=container so the next run recreates it."
 
       - name: Publish Artifacts
         run: make publish BRANCH_NAME=${GITHUB_REF##*/}
@@ -211,17 +209,9 @@ jobs:
       - name: Verify both artifacts are multi-arch image indexes
         run: |
           set -euo pipefail
-          for ref in "${IMAGE}:${GITHUB_REF_NAME}" "${IMAGE}:controller-${GITHUB_REF_NAME}"; do
-            echo "==> ${ref}"
-            platforms="$(docker buildx imagetools inspect "${ref}" --format '{{range .Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
-            echo "${platforms}"
-            for p in linux/amd64 linux/arm64; do
-              case "${platforms}" in
-                *"${p}"*) ;;
-                *) echo "::error::${ref} is missing the ${p} platform"; exit 1 ;;
-              esac
-            done
-          done
+          hack/verify-multiarch.sh \
+            "${IMAGE}:${GITHUB_REF_NAME}" \
+            "${IMAGE}:controller-${GITHUB_REF_NAME}"
 
       - name: Promote to the stable channel
         run: make -j2 promote BRANCH_NAME=${GITHUB_REF##*/}

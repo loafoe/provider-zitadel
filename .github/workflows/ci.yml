@@ -287,14 +287,6 @@ jobs:
         run: |
           set -euo pipefail
           org="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
-          for ref in "ghcr.io/${org}/provider-zitadel:${VERSION}" "ghcr.io/${org}/provider-zitadel:controller-${VERSION}"; do
-            echo "==> ${ref}"
-            platforms="$(docker buildx imagetools inspect "${ref}" --format '{{range .Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
-            echo "${platforms}"
-            for p in linux/amd64 linux/arm64; do
-              case "${platforms}" in
-                *"${p}"*) ;;
-                *) echo "::error::${ref} is missing the ${p} platform"; exit 1 ;;
-              esac
-            done
-          done
+          hack/verify-multiarch.sh \
+            "ghcr.io/${org}/provider-zitadel:${VERSION}" \
+            "ghcr.io/${org}/provider-zitadel:controller-${VERSION}"
