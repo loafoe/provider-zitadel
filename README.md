@@ -319,11 +319,16 @@ All references cover: linux/amd64 linux/arm64
 ```
 
 It fails, listing every problem rather than the first, when a reference is not a
-multi-arch index at all, when a platform is missing, or when the reference
-cannot be read. The manifest is parsed with `imagetools inspect --raw` and `jq`
-rather than a buildx `--format` template, because the template context changed
-between buildx versions and an older runner silently fails to resolve
-`.Manifests`.
+multi-arch index at all, when a platform is missing, or when the reference cannot
+be read — and it says which of those it was.
+
+It reads manifests with `crane` when installed, falling back to
+`imagetools inspect --raw`, and parses them with `jq` rather than a buildx
+`--format` template: the template context changed between buildx versions and an
+older runner fails to resolve `.Manifests`. `crane` is preferred because it can
+read a public registry anonymously, while `docker buildx imagetools inspect`
+wants a docker login even for a public image — and verifying a public release is
+exactly what you want to do without a credential.
 
 Branch builds pushed by `ci.yml` are deliberately **not** signed. A cluster with
 package signature verification enabled must install a `v*` tag, and signing a

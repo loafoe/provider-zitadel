@@ -14,18 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Verify that every reference given on the command line is an OCI image index
-# that covers the platforms this provider promises to support.
+# Verify that every reference given on the command line is a multi-arch OCI
+# image index covering the platforms this provider promises to support.
 #
 # The provider is only ever published as a multi-arch image: one entry per
 # platform in the package index, each embedding that platform's controller
 # image. A single-arch release would be silently un-pullable on the other
-# architecture, so this is checked after every publish and promote.
+# architecture, so this runs after every publish and promote.
 #
-# The manifest is read with `imagetools inspect --raw` and parsed with jq rather
-# than with a `--format` template: the template context differs between buildx
-# versions (older ones have no `.Manifests`), and `--raw` is the raw manifest
-# bytes, so it does not change.
+# The manifest is read as raw bytes and parsed with jq, never with a buildx
+# `--format` template: the template context differs between buildx versions
+# (older ones have no `.Manifests`) and fails at evaluation time.
+#
+# crane is preferred when installed because it can read a public registry
+# anonymously. `docker buildx imagetools inspect` needs a docker login even for a
+# public image, and the main consumer of this script is a person checking a
+# public release without a registry credential.
 #
 # Usage: hack/verify-multiarch.sh <image-reference>...
 
@@ -34,9 +38,38 @@ set -euo pipefail
 # The platforms this provider is published for.
 readonly PLATFORMS=(linux/amd64 linux/arm64)
 
-# A digest or a reference is never inspected for its attestation manifests: those
-# carry an "unknown/unknown" platform by design.
-filter_platform() {
+# read_manifest writes the raw manifest of a reference to stdout, and on failure
+# writes the reason to stderr, so an unreadable reference is actionable instead
+# of a bare "could not be inspected".
+read_manifest() {
+	local ref="$1"
+
+	if command -v crane >/dev/null 2>&1 && crane manifest "${ref}" 2>/dev/null; then
+		return 0
+	fi
+
+	if docker buildx imagetools inspect "${ref}" --raw 2>/dev/null; then
+		return 0
+	fi
+
+	# Say which of the possible causes it is: this is the difference between
+	# "the release is broken" and "you have no tooling".
+	if ! command -v docker >/dev/null 2>&1; then
+		echo "neither crane nor docker is installed" >&2
+	elif ! docker buildx version >/dev/null 2>&1; then
+		echo "docker buildx is unavailable; install the buildx CLI plugin" >&2
+	else
+		echo "the registry refused the request; the reference may not exist, or the registry may require a login even for a public image" >&2
+	fi
+
+	return 1
+}
+
+# platforms_of prints the linux platforms an index covers.
+#
+# Attestation manifests (SBOM, provenance) are excluded: buildx gives them an
+# "unknown/unknown" platform by design, and they are not something anyone pulls.
+platforms_of() {
 	jq -r '
 		[ (.manifests // [])[]
 		  | select(.platform.os != "unknown" and .platform.architecture != "unknown")
@@ -45,21 +78,26 @@ filter_platform() {
 	'
 }
 
+manifest_file="$(mktemp)"
+reason_file="$(mktemp)"
+# shellcheck disable=SC2064 # expand now, the variables outlive the trap body
+trap "rm -f '${manifest_file}' '${reason_file}'" EXIT
+
 failed=0
 
 for ref in "$@"; do
 	echo "==> ${ref}"
 
-	if ! manifest="$(docker buildx imagetools inspect "${ref}" --raw 2>/dev/null)"; then
-		echo "::error::${ref} could not be inspected. If it was just published, the registry may still be propagating it."
+	if ! read_manifest "${ref}" >"${manifest_file}" 2>"${reason_file}"; then
+		echo "::error::${ref} could not be read: $(<"${reason_file}")"
 		failed=1
 		continue
 	fi
 
-	# An image index is an OCI image index or a Docker manifest list. Both are
-	# multi-arch, and both are valid to install from; anything else is a single
-	# platform image, which is not publishable here.
-	media_type="$(jq -r '.mediaType // ""' <<<"${manifest}")"
+	# An image index is either an OCI image index or a Docker manifest list.
+	# Both are multi-arch and both are valid to install from; anything else is a
+	# single platform image, which is not publishable here.
+	media_type="$(jq -r '.mediaType // ""' <"${manifest_file}")"
 	case "${media_type}" in
 	*index* | *manifest.list*) ;;
 	*)
@@ -69,7 +107,7 @@ for ref in "$@"; do
 		;;
 	esac
 
-	platforms="$(filter_platform <<<"${manifest}")"
+	platforms="$(platforms_of <"${manifest_file}")"
 	echo "    mediaType: ${media_type}"
 	echo "    platforms: ${platforms//$'\n'/, }"
 
