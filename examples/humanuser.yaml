@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alice-initial-password
+  namespace: zitadel
+stringData:
+  password: Str0ng-Passw0rd!
+---
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: HumanUser
+metadata:
+  name: alice
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  writeConnectionSecretToRef:
+    name: alice-oidc
+  forProvider:
+    organizationRef:
+      name: platform
+    givenName: Alice
+    familyName: Smith
+    email: alice@example.com
+    userName: alice@example.com
+    emailVerification: Verified
+    phone: "+491234567890"
+    phoneVerification: Verified
+    passwordSecretRef:
+      name: alice-initial-password
+      key: password
+    passwordChangeRequired: true
+    metadata:
+      - key: department
+        value: finance

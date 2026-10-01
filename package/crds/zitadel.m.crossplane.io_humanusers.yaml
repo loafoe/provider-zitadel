@@ -1,0 +1,470 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: humanusers.zitadel.m.crossplane.io
+spec:
+  group: zitadel.m.crossplane.io
+  names:
+    categories:
+    - crossplane
+    - managed
+    - zitadel
+    kind: HumanUser
+    listKind: HumanUserList
+    plural: humanusers
+    singular: humanuser
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Synced')].status
+      name: SYNCED
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .status.atProvider.state
+      name: STATE
+      type: string
+    - jsonPath: .status.atProvider.userName
+      name: USERNAME
+      type: string
+    - jsonPath: .status.atProvider.id
+      name: ID
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: A HumanUser is an interactive (human) Zitadel user.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: A HumanUserSpec defines the desired state of a HumanUser.
+            properties:
+              forProvider:
+                description: HumanUserParameters are the configurable fields of a
+                  HumanUser.
+                properties:
+                  displayName:
+                    description: DisplayName of the user. Defaults to "<givenName>
+                      <familyName>".
+                    type: string
+                  email:
+                    description: Email is the email address of the user.
+                    type: string
+                  emailVerification:
+                    description: |-
+                      EmailVerification determines how Zitadel handles the email address.
+                      Defaults to SendCode.
+                    enum:
+                    - SendCode
+                    - ReturnCode
+                    - Verified
+                    type: string
+                  familyName:
+                    description: FamilyName is the last name of the user.
+                    type: string
+                  gender:
+                    description: Gender of the user.
+                    enum:
+                    - Female
+                    - Male
+                    - Diverse
+                    - Unspecified
+                    type: string
+                  givenName:
+                    description: GivenName is the first name of the user.
+                    type: string
+                  id:
+                    description: |-
+                      ID allows setting a custom user ID. If omitted Zitadel generates one. It
+                      cannot be changed after creation.
+                    type: string
+                  idpLinks:
+                    description: |-
+                      IDPLinks are identity provider links added at creation time. Useful for
+                      migration scenarios.
+                    items:
+                      description: IDPLink references a user at an upstream identity
+                        provider.
+                      properties:
+                        idpID:
+                          description: IDPID is the ID of the identity provider.
+                          type: string
+                        userID:
+                          description: UserID is the ID of the user at the identity
+                            provider.
+                          type: string
+                        userName:
+                          description: UserName is the user name at the identity provider.
+                          type: string
+                      required:
+                      - idpID
+                      - userID
+                      - userName
+                      type: object
+                    type: array
+                  metadata:
+                    description: Metadata entries set on the user. Only used on creation.
+                    items:
+                      description: MetadataEntry is a single metadata key/value pair.
+                      properties:
+                        key:
+                          description: Key of the metadata entry.
+                          type: string
+                        value:
+                          description: Value of the metadata entry.
+                          type: string
+                      required:
+                      - key
+                      - value
+                      type: object
+                    type: array
+                  nickName:
+                    description: NickName of the user.
+                    type: string
+                  organizationID:
+                    description: |-
+                      OrganizationID is the ID of the organization owning the user. Either
+                      `organizationID`, `organizationRef` or `organizationSelector` must be set.
+                    type: string
+                  organizationRef:
+                    description: |-
+                      OrganizationRef references an Organization managed by this provider and
+                      uses its ID.
+                    properties:
+                      name:
+                        description: Name of the referenced object.
+                        type: string
+                      policy:
+                        description: Policies for referencing.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    required:
+                    - name
+                    type: object
+                  organizationSelector:
+                    description: |-
+                      OrganizationSelector selects an Organization managed by this provider and
+                      uses its ID.
+                    properties:
+                      matchControllerRef:
+                        description: |-
+                          MatchControllerRef ensures an object with the same controller reference
+                          as the selecting object is selected.
+                        type: boolean
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: MatchLabels ensures an object with matching labels
+                          is selected.
+                        type: object
+                      policy:
+                        description: Policies for selection.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    type: object
+                  passwordChangeRequired:
+                    description: |-
+                      PasswordChangeRequired forces the user to change the initial password on
+                      the first login. Only used on creation.
+                    type: boolean
+                  passwordSecretRef:
+                    description: |-
+                      PasswordSecretRef references the secret key holding the initial password
+                      of the user. Zitadel never returns the password again, so changing it
+                      does not update the remote user. Only used on creation.
+                    properties:
+                      key:
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
+                  phone:
+                    description: Phone of the user in E.164 format.
+                    type: string
+                  phoneVerification:
+                    description: PhoneVerification determines how Zitadel handles
+                      the phone number.
+                    enum:
+                    - SendCode
+                    - ReturnCode
+                    - Verified
+                    type: string
+                  preferredLanguage:
+                    description: PreferredLanguage of the user, as an ISO 639-1 code,
+                      e.g. "en".
+                    type: string
+                  state:
+                    description: State of the user. Defaults to Active.
+                    enum:
+                    - Active
+                    - Inactive
+                    - Locked
+                    - Initial
+                    type: string
+                  userName:
+                    description: |-
+                      UserName is the unique username of the user within the organization. If
+                      omitted Zitadel defaults it to the email address.
+                    type: string
+                required:
+                - email
+                - familyName
+                - givenName
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: |-
+                  THIS IS A BETA FIELD. It is on by default but can be opted out
+                  through a Crossplane feature flag.
+                  ManagementPolicies specify the array of actions Crossplane is allowed to
+                  take on the managed and external resources.
+                  See the design doc for more information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md
+                items:
+                  description: |-
+                    A ManagementAction represents an action that the Crossplane controllers
+                    can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
+              providerConfigRef:
+                default:
+                  kind: ClusterProviderConfig
+                  name: default
+                description: |-
+                  ProviderConfigReference specifies how the provider that will be used to
+                  create, observe, update, and delete this managed resource should be
+                  configured.
+                properties:
+                  kind:
+                    description: Kind of the referenced object.
+                    type: string
+                  name:
+                    description: Name of the referenced object.
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+              writeConnectionSecretToRef:
+                description: |-
+                  WriteConnectionSecretToReference specifies the namespace and name of a
+                  Secret to which any connection details for this managed resource should
+                  be written. Connection details frequently include the endpoint, username,
+                  and password required to connect to the managed resource.
+                properties:
+                  name:
+                    description: Name of the secret.
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - forProvider
+            type: object
+          status:
+            description: A HumanUserStatus represents the observed state of a HumanUser.
+            properties:
+              atProvider:
+                description: HumanUserObservation are the observable fields of a HumanUser.
+                properties:
+                  changeDate:
+                    description: ChangeDate is the timestamp the user was last modified
+                      at.
+                    format: date-time
+                    type: string
+                  creationDate:
+                    description: CreationDate is the timestamp the user was created
+                      at.
+                    format: date-time
+                    type: string
+                  displayName:
+                    description: DisplayName of the user.
+                    type: string
+                  email:
+                    description: Email of the user.
+                    type: string
+                  emailVerified:
+                    description: EmailVerified reports whether the email address is
+                      verified.
+                    type: boolean
+                  id:
+                    description: ID is the Zitadel user ID.
+                    type: string
+                  loginNames:
+                    description: LoginNames are all login names of the user.
+                    items:
+                      type: string
+                    type: array
+                  nickName:
+                    description: NickName of the user.
+                    type: string
+                  organizationID:
+                    description: OrganizationID is the ID of the owning organization.
+                    type: string
+                  passwordChangeRequired:
+                    description: |-
+                      PasswordChangeRequired reports whether the user must change its password
+                      on the next login.
+                    type: boolean
+                  phone:
+                    description: Phone of the user.
+                    type: string
+                  phoneVerified:
+                    description: PhoneVerified reports whether the phone number is
+                      verified.
+                    type: boolean
+                  preferredLoginName:
+                    description: |-
+                      PreferredLoginName is the primary login name of the user, e.g.
+                      "john.doe@example.com".
+                    type: string
+                  state:
+                    description: State of the user.
+                    enum:
+                    - Active
+                    - Inactive
+                    - Locked
+                    - Initial
+                    type: string
+                  userName:
+                    description: UserName of the user.
+                    type: string
+                type: object
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  description: A Condition that may apply to a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        LastTransitionTime is the last time this condition transitioned from one
+                        status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A Message containing details about this condition's last transition from
+                        one status to another, if any.
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      type: integer
+                    reason:
+                      description: A Reason for this condition's last transition from
+                        one status to another.
+                      type: string
+                    status:
+                      description: Status of this condition; is it currently True,
+                        False, or Unknown?
+                      type: string
+                    type:
+                      description: |-
+                        Type of this condition. At most one of each condition type may apply to
+                        a resource at any point in time.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the latest metadata.generation
+                  which resulted in either a ready state, or stalled due to error
+                  it can not recover from without human intervention.
+                format: int64
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

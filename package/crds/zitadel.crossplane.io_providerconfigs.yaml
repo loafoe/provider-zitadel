@@ -1,0 +1,213 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: providerconfigs.zitadel.crossplane.io
+spec:
+  group: zitadel.crossplane.io
+  names:
+    categories:
+    - crossplane
+    - provider
+    - zitadel
+    kind: ProviderConfig
+    listKind: ProviderConfigList
+    plural: providerconfigs
+    singular: providerconfig
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    - jsonPath: .spec.url
+      name: URL
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: A ProviderConfig configures a Zitadel provider.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ProviderConfigSpec defines the configuration for connecting
+              to Zitadel.
+            properties:
+              credentials:
+                description: Credentials contains the authentication configuration
+                  for Zitadel.
+                properties:
+                  authType:
+                    description: AuthType specifies which Zitadel service account
+                      credential is used.
+                    enum:
+                    - ServiceAccount
+                    - Token
+                    type: string
+                  serviceAccount:
+                    description: |-
+                      ServiceAccount holds the machine key of a Zitadel service account.
+                      Required when authType is "ServiceAccount".
+                    properties:
+                      keySecretRef:
+                        description: |-
+                          KeySecretRef references the secret key holding the JSON encoded
+                          machine key of a Zitadel service account, i.e. the key file downloaded
+                          from the Zitadel console:
+                          `{"type":"serviceaccount","keyId":"...","key":"-----BEGIN RSA PRIVATE KEY-----..."}`.
+                          The service account must use the "Jwt" access token type.
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            description: Name of the secret.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                    required:
+                    - keySecretRef
+                    type: object
+                  source:
+                    default: Secret
+                    description: Source of the provider credentials.
+                    enum:
+                    - None
+                    - Secret
+                    type: string
+                  token:
+                    description: |-
+                      Token holds the Personal Access Token of a Zitadel service account.
+                      Required when authType is "Token".
+                    properties:
+                      tokenSecretRef:
+                        description: |-
+                          TokenSecretRef references the secret key holding the Personal Access
+                          Token of a Zitadel service account.
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            description: Name of the secret.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                    required:
+                    - tokenSecretRef
+                    type: object
+                required:
+                - authType
+                - source
+                type: object
+              insecure:
+                default: false
+                description: |-
+                  Insecure disables TLS when talking to the Zitadel API. Only useful for
+                  local development instances without TLS.
+                type: boolean
+              insecureSkipTLSVerify:
+                default: false
+                description: |-
+                  InsecureSkipTLSVerify skips verification of the Zitadel server
+                  certificate. Only useful for instances using a self signed certificate.
+                type: boolean
+              organizationID:
+                description: |-
+                  OrganizationID sets the organization context (`x-zitadel-orgid`) used for
+                  all API calls that do not carry an explicit organization ID. Resources
+                  that set `spec.forProvider.organizationID` (or a reference to an
+                  Organization) always win.
+                type: string
+              url:
+                description: |-
+                  URL is the base URL of the Zitadel instance, i.e. the issuer of the
+                  instance. For example `https://my-instance.zitadel.cloud`. The gRPC API
+                  endpoint is derived from it (`<host>:443`, or `<host>:80` when insecure
+                  is enabled).
+                type: string
+            required:
+            - credentials
+            - url
+            type: object
+          status:
+            description: A ProviderConfigStatus defines the status of a Provider.
+            properties:
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  description: A Condition that may apply to a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        LastTransitionTime is the last time this condition transitioned from one
+                        status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A Message containing details about this condition's last transition from
+                        one status to another, if any.
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      type: integer
+                    reason:
+                      description: A Reason for this condition's last transition from
+                        one status to another.
+                      type: string
+                    status:
+                      description: Status of this condition; is it currently True,
+                        False, or Unknown?
+                      type: string
+                    type:
+                      description: |-
+                        Type of this condition. At most one of each condition type may apply to
+                        a resource at any point in time.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              users:
+                description: Users of this provider configuration.
+                format: int64
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

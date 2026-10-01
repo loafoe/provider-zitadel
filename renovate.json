@@ -1,0 +1,11 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommitsDisabled"],
+  "ignoreDeps": [],
+  "packageRules": [
+    {
+      "matchManagers": ["gomod", "golang-version", "github-actions"],
+      "groupName": "Go and CI dependencies"
+    }
+  ]
+}

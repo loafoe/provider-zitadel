@@ -1,0 +1,15 @@
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: Project
+metadata:
+  name: billing
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    name: Billing
+    organizationRef:
+      name: platform
+    projectRoleAssertion: true
+    authorizationRequired: true

@@ -1,0 +1,13 @@
+apiVersion: meta.pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-zitadel
+  annotations:
+    meta.crossplane.io/maintainer: Andy Lo-A-Foe <andy.loafoe@gmail.com>
+    meta.crossplane.io/source: github.com/loafoe/provider-zitadel
+    meta.crossplane.io/license: Apache-2.0
+    meta.crossplane.io/description: |
+      A native Crossplane provider for Zitadel.
+  icon: https://raw.githubusercontent.com/zitadel/zitadel/main/docs/img/zitadel-logo.png
+spec:
+  capabilities: []

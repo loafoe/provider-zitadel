@@ -1,0 +1,112 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  GO_VERSION: '1.27'
+  DOCKER_BUILDX_VERSION: 'v0.23.0'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # QEMU is what makes the linux/arm64 image buildable on the runner. The
+      # provider image is always published as a multi-arch image index covering
+      # linux/amd64 and linux/arm64.
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: ${{ env.DOCKER_BUILDX_VERSION }}
+          install: true
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Fetch History
+        run: git fetch --prune --unshallow
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Find the Go Build Cache
+        id: go
+        run: echo "cachedir=$(make go.cachedir)" >> $GITHUB_ENV
+
+      - name: Cache the Go Build Cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.go.outputs.cachedir }}
+          key: ${{ runner.os }}-build-release-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-build-release-
+
+      - name: Cache Go Dependencies
+        uses: actions/cache@v4
+        with:
+          path: .work/pkg
+          key: ${{ runner.os }}-pkg-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-pkg-
+
+      - name: Download Go Modules
+        run: make modules.download modules.check
+
+      - name: Run Unit Tests
+        run: make -j2 test
+
+      - name: Build Artifacts
+        run: make -j2 build.all
+        env:
+          BUILD_ARGS: "--load"
+
+      - name: Publish Artifacts
+        run: make publish BRANCH_NAME=${GITHUB_REF##*/}
+        env:
+          VERSION: ${{ github.ref_name }}
+          XPKG_REG_ORGS: ghcr.io/${{ github.repository_owner }}
+          REGISTRY_ORGS: ghcr.io/${{ github.repository_owner }}
+
+      - name: Verify the published images are multi-arch
+        run: |
+          set -euo pipefail
+          org="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          for image in "ghcr.io/${org}/provider-zitadel:${GITHUB_REF_NAME}" "ghcr.io/${org}/provider-zitadel:${GITHUB_REF_NAME}-linux_amd64"; do
+            echo "==> ${image}"
+            platforms="$(docker buildx imagetools inspect "${image}" --format '{{range .Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
+            echo "${platforms}"
+            for p in linux/amd64 linux/arm64; do
+              case "${platforms}" in
+                *"${p}"*) ;;
+                *) echo "::error::${image} is missing the ${p} platform"; exit 1 ;;
+              esac
+            done
+          done
+
+      - name: Promote to the stable channel
+        run: make -j2 promote BRANCH_NAME=${GITHUB_REF##*/}
+        env:
+          VERSION: ${{ github.ref_name }}
+          CHANNEL: stable
+          XPKG_REG_ORGS: ghcr.io/${{ github.repository_owner }}
+          REGISTRY_ORGS: ghcr.io/${{ github.repository_owner }}

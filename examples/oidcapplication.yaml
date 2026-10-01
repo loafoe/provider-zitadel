@@ -1,0 +1,29 @@
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: OIDCApplication
+metadata:
+  name: billing-web
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  writeConnectionSecretToRef:
+    name: billing-web-oidc
+  forProvider:
+    name: Billing Web
+    projectRef:
+      name: billing
+    redirectURIs:
+      - https://billing.example.com/auth/callback
+    postLogoutRedirectURIs:
+      - https://billing.example.com
+    responseTypes:
+      - Code
+    grantTypes:
+      - AuthorizationCode
+      - RefreshToken
+    applicationType: Web
+    authMethodType: Basic
+    accessTokenType: Jwt
+    accessTokenRoleAssertion: true
+    idTokenRoleAssertion: true

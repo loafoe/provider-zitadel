@@ -1,0 +1,15 @@
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: ProjectRole
+metadata:
+  name: billing-reader
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    key: reader
+    displayName: Reader
+    group: Billing
+    projectRef:
+      name: billing

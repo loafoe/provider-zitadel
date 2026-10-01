@@ -1,0 +1,524 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: oidcapplications.zitadel.m.crossplane.io
+spec:
+  group: zitadel.m.crossplane.io
+  names:
+    categories:
+    - crossplane
+    - managed
+    - zitadel
+    kind: OIDCApplication
+    listKind: OIDCApplicationList
+    plural: oidcapplications
+    singular: oidcapplication
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Synced')].status
+      name: SYNCED
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .status.atProvider.state
+      name: STATE
+      type: string
+    - jsonPath: .status.atProvider.clientID
+      name: CLIENT-ID
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: An OIDCApplication is an OAuth2/OIDC client registered with Zitadel.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: An OIDCApplicationSpec defines the desired state of an OIDCApplication.
+            properties:
+              forProvider:
+                description: OIDCApplicationParameters are the configurable fields
+                  of an OIDCApplication.
+                properties:
+                  accessTokenRoleAssertion:
+                    description: AccessTokenRoleAssertion adds the roles of the user
+                      to the access token.
+                    type: boolean
+                  accessTokenType:
+                    description: |-
+                      AccessTokenType is the format of the issued access tokens. Defaults to
+                      Bearer.
+                    enum:
+                    - Bearer
+                    - Jwt
+                    type: string
+                  additionalOrigins:
+                    description: AdditionalOrigins are additional allowed CORS origins.
+                    items:
+                      type: string
+                    type: array
+                  applicationType:
+                    description: ApplicationType describes the kind of client. Defaults
+                      to Web.
+                    enum:
+                    - Web
+                    - UserAgent
+                    - Native
+                    type: string
+                  authMethodType:
+                    description: AuthMethodType is the client authentication method.
+                      Defaults to Basic.
+                    enum:
+                    - Basic
+                    - Post
+                    - None
+                    - PrivateKeyJwt
+                    type: string
+                  backChannelLogoutURI:
+                    description: BackChannelLogoutURI is the URI notified on back-channel
+                      logout.
+                    type: string
+                  clockSkew:
+                    description: |-
+                      ClockSkew is the amount of leeway granted when validating timestamps,
+                      e.g. "5s".
+                    type: string
+                  developmentMode:
+                    description: |-
+                      DevelopmentMode relaxes some security checks and allows, for example,
+                      http redirect URIs on web applications. Never enable it in production.
+                    type: boolean
+                  grantTypes:
+                    description: |-
+                      GrantTypes supported by the application. Defaults to
+                      [AuthorizationCode, RefreshToken].
+                    items:
+                      description: OIDCGrantType is an OAuth2 grant supported by an
+                        OIDC application.
+                      enum:
+                      - AuthorizationCode
+                      - Implicit
+                      - RefreshToken
+                      - DeviceCode
+                      - TokenExchange
+                      type: string
+                    type: array
+                  id:
+                    description: |-
+                      ID allows setting a custom application ID. If omitted Zitadel generates
+                      one. It cannot be changed after creation.
+                    type: string
+                  idTokenRoleAssertion:
+                    description: IDTokenRoleAssertion adds the roles of the user to
+                      the ID token.
+                    type: boolean
+                  idTokenUserinfoAssertion:
+                    description: IDTokenUserinfoAssertion adds the userinfo claims
+                      to the ID token.
+                    type: boolean
+                  name:
+                    description: Name is the display name of the application.
+                    minLength: 1
+                    type: string
+                  postLogoutRedirectURIs:
+                    description: |-
+                      PostLogoutRedirectURIs are the URIs the user may be redirected to after
+                      logging out.
+                    items:
+                      type: string
+                    type: array
+                  projectID:
+                    description: |-
+                      ProjectID is the ID of the project the application belongs to. Either
+                      `projectID`, `projectRef` or `projectSelector` must be set.
+                    type: string
+                  projectRef:
+                    description: ProjectRef references a Project managed by this provider
+                      and uses its ID.
+                    properties:
+                      name:
+                        description: Name of the referenced object.
+                        type: string
+                      policy:
+                        description: Policies for referencing.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    required:
+                    - name
+                    type: object
+                  projectSelector:
+                    description: |-
+                      ProjectSelector selects a Project managed by this provider and uses its
+                      ID.
+                    properties:
+                      matchControllerRef:
+                        description: |-
+                          MatchControllerRef ensures an object with the same controller reference
+                          as the selecting object is selected.
+                        type: boolean
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: MatchLabels ensures an object with matching labels
+                          is selected.
+                        type: object
+                      policy:
+                        description: Policies for selection.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    type: object
+                  redirectURIs:
+                    description: RedirectURIs are the URIs the authorization server
+                      may redirect to.
+                    items:
+                      type: string
+                    minItems: 1
+                    type: array
+                  regenerateClientSecret:
+                    description: |-
+                      RegenerateClientSecret requests a new client secret on every reconcile
+                      where the application is (re)created. The new secret is published to the
+                      connection secret. Note that this is a destructive operation - the
+                      previously issued secret stops working immediately.
+                    type: boolean
+                  responseTypes:
+                    description: ResponseTypes the application may request. Defaults
+                      to [Code].
+                    items:
+                      description: OIDCResponseType is a response type returned by
+                        an OIDC application.
+                      enum:
+                      - Code
+                      - IdToken
+                      - IdTokenToken
+                      type: string
+                    type: array
+                  skipNativeAppSuccessPage:
+                    description: |-
+                      SkipNativeAppSuccessPage skips the success page shown after native app
+                      logins.
+                    type: boolean
+                  state:
+                    description: |-
+                      State of the application. Defaults to Active. Setting it to Inactive
+                      deactivates the application, setting it back to Active reactivates it.
+                    enum:
+                    - Active
+                    - Inactive
+                    - Removed
+                    type: string
+                  version:
+                    description: Version is the OIDC version. Defaults to "1.0".
+                    enum:
+                    - "1.0"
+                    type: string
+                required:
+                - name
+                - redirectURIs
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: |-
+                  THIS IS A BETA FIELD. It is on by default but can be opted out
+                  through a Crossplane feature flag.
+                  ManagementPolicies specify the array of actions Crossplane is allowed to
+                  take on the managed and external resources.
+                  See the design doc for more information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md
+                items:
+                  description: |-
+                    A ManagementAction represents an action that the Crossplane controllers
+                    can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
+              providerConfigRef:
+                default:
+                  kind: ClusterProviderConfig
+                  name: default
+                description: |-
+                  ProviderConfigReference specifies how the provider that will be used to
+                  create, observe, update, and delete this managed resource should be
+                  configured.
+                properties:
+                  kind:
+                    description: Kind of the referenced object.
+                    type: string
+                  name:
+                    description: Name of the referenced object.
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+              writeConnectionSecretToRef:
+                description: |-
+                  WriteConnectionSecretToReference specifies the namespace and name of a
+                  Secret to which any connection details for this managed resource should
+                  be written. Connection details frequently include the endpoint, username,
+                  and password required to connect to the managed resource.
+                properties:
+                  name:
+                    description: Name of the secret.
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - forProvider
+            type: object
+          status:
+            description: An OIDCApplicationStatus represents the observed state of
+              an OIDCApplication.
+            properties:
+              atProvider:
+                description: OIDCApplicationObservation are the observable fields
+                  of an OIDCApplication.
+                properties:
+                  accessTokenType:
+                    description: AccessTokenType of the application.
+                    enum:
+                    - Bearer
+                    - Jwt
+                    type: string
+                  allowedOrigins:
+                    description: AllowedOrigins are the CORS origins Zitadel allows
+                      for this client.
+                    items:
+                      type: string
+                    type: array
+                  applicationType:
+                    description: ApplicationType of the application.
+                    enum:
+                    - Web
+                    - UserAgent
+                    - Native
+                    type: string
+                  authMethodType:
+                    description: AuthMethodType of the application.
+                    enum:
+                    - Basic
+                    - Post
+                    - None
+                    - PrivateKeyJwt
+                    type: string
+                  changeDate:
+                    description: ChangeDate is the timestamp the application was last
+                      modified at.
+                    format: date-time
+                    type: string
+                  clientID:
+                    description: ClientID is the OAuth2 client ID of the application.
+                    type: string
+                  complianceProblems:
+                    description: ComplianceProblems lists the reasons for a non compliant
+                      configuration.
+                    items:
+                      description: |-
+                        OIDCComplianceProblem is a single reason why Zitadel considers an OIDC
+                        application non compliant.
+                      properties:
+                        key:
+                          description: Key of the compliance problem.
+                          type: string
+                        localizedMessage:
+                          description: LocalizedMessage describing the compliance
+                            problem.
+                          type: string
+                      type: object
+                    type: array
+                  creationDate:
+                    description: CreationDate is the timestamp the application was
+                      created at.
+                    format: date-time
+                    type: string
+                  grantTypes:
+                    description: GrantTypes currently configured on the application.
+                    items:
+                      description: OIDCGrantType is an OAuth2 grant supported by an
+                        OIDC application.
+                      enum:
+                      - AuthorizationCode
+                      - Implicit
+                      - RefreshToken
+                      - DeviceCode
+                      - TokenExchange
+                      type: string
+                    type: array
+                  id:
+                    description: ID is the Zitadel application ID.
+                    type: string
+                  name:
+                    description: Name is the display name of the application.
+                    type: string
+                  nonCompliant:
+                    description: |-
+                      NonCompliant is true when Zitadel flagged the application as non
+                      compliant with the OIDC specification.
+                    type: boolean
+                  postLogoutRedirectURIs:
+                    description: PostLogoutRedirectURIs currently configured on the
+                      application.
+                    items:
+                      type: string
+                    type: array
+                  projectID:
+                    description: ProjectID is the ID of the owning project.
+                    type: string
+                  redirectURIs:
+                    description: RedirectURIs currently configured on the application.
+                    items:
+                      type: string
+                    type: array
+                  responseTypes:
+                    description: ResponseTypes currently configured on the application.
+                    items:
+                      description: OIDCResponseType is a response type returned by
+                        an OIDC application.
+                      enum:
+                      - Code
+                      - IdToken
+                      - IdTokenToken
+                      type: string
+                    type: array
+                  state:
+                    description: State of the application.
+                    enum:
+                    - Active
+                    - Inactive
+                    - Removed
+                    type: string
+                type: object
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  description: A Condition that may apply to a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        LastTransitionTime is the last time this condition transitioned from one
+                        status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A Message containing details about this condition's last transition from
+                        one status to another, if any.
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      type: integer
+                    reason:
+                      description: A Reason for this condition's last transition from
+                        one status to another.
+                      type: string
+                    status:
+                      description: Status of this condition; is it currently True,
+                        False, or Unknown?
+                      type: string
+                    type:
+                      description: |-
+                        Type of this condition. At most one of each condition type may apply to
+                        a resource at any point in time.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the latest metadata.generation
+                  which resulted in either a ready state, or stalled due to error
+                  it can not recover from without human intervention.
+                format: int64
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

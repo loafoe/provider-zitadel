@@ -1,0 +1,11 @@
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: Organization
+metadata:
+  name: platform
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    name: Platform

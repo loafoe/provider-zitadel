@@ -1,0 +1,70 @@
+name: Promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. v0.1.0)'
+        required: true
+      channel:
+        description: 'Release channel'
+        required: true
+        default: 'stable'
+
+jobs:
+  promote-artifacts:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: ${{ env.DOCKER_BUILDX_VERSION }}
+          install: true
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Fetch History
+        run: git fetch --prune --unshallow
+
+      - name: Promote Artifacts
+        run: make -j2 promote BRANCH_NAME=${GITHUB_REF##*/}
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+          CHANNEL: ${{ github.event.inputs.channel }}
+          XPKG_REG_ORGS: ghcr.io/${{ github.repository_owner }}
+          REGISTRY_ORGS: ghcr.io/${{ github.repository_owner }}
+
+      - name: Verify the promoted images are multi-arch
+        run: |
+          set -euo pipefail
+          org="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          for image in "ghcr.io/${org}/provider-zitadel:${{ github.event.inputs.channel }}" "ghcr.io/${org}/provider-zitadel:${{ github.event.inputs.version }}"; do
+            echo "==> ${image}"
+            platforms="$(docker buildx imagetools inspect "${image}" --format '{{range .Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
+            echo "${platforms}"
+            for p in linux/amd64 linux/arm64; do
+              case "${platforms}" in
+                *"${p}"*) ;;
+                *) echo "::error::${image} is missing the ${p} platform"; exit 1 ;;
+              esac
+            done
+          done

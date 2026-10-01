@@ -1,0 +1,21 @@
+# A ProviderConfig authenticating with the Personal Access Token of a Zitadel
+# service account. Useful for quick tests, but prefer the service account key
+# (see providerconfig-serviceaccount.yaml) for long lived deployments: a PAT
+# does not expire.
+---
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: zitadel-pat
+  namespace: zitadel
+spec:
+  url: https://auth.internal.loafoe.com
+  # Default organization for resources that do not set one explicitly.
+  organizationID: "1234567890"
+  credentials:
+    source: Secret
+    authType: Token
+    token:
+      tokenSecretRef:
+        name: zitadel-sa-pat
+        key: token
