@@ -117,6 +117,17 @@ jobs:
       - name: Review the change
         run: make -j2 reviewable
 
+      - name: Check that the build version matches the tag
+        run: |
+          set -euo pipefail
+          version="$(make print-version)"
+          echo "tag:    ${GITHUB_REF_NAME}"
+          echo "build:  ${version}"
+          if [ "${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::The version the build machinery derived (${version}) does not match the pushed tag (${GITHUB_REF_NAME}). Refusing to publish a package under a tag that says one thing and contains another."
+            exit 1
+          fi
+
       - name: Build Artifacts
         run: make -j2 build.all
         env:

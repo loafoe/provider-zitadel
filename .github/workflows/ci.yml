@@ -261,11 +261,18 @@ jobs:
       # signature verification enabled must install a release tag, which
       # release.yml signs. Signing here as well would let a mutable branch ref
       # stand in for a release.
+      # make publish tags the artifacts with the version derived from git, not
+      # with the branch name, so the verification below has to ask for it.
+      - name: Resolve the build version
+        id: version
+        run: echo "version=$(make print-version)" >> "$GITHUB_OUTPUT"
+
       - name: Publish Artifacts to GHCR
         id: publish
         continue-on-error: true
         run: make publish BRANCH_NAME=${GITHUB_REF##*/}
         env:
+          VERSION: ${{ steps.version.outputs.version }}
           XPKG_REG_ORGS: ghcr.io/${{ github.repository_owner }}
 
       - name: Report a failed publish
@@ -273,18 +280,21 @@ jobs:
         run: |
           echo "::warning title=Package not published::The package ghcr.io/${{ github.repository_owner }}/provider-zitadel could not be published from this workflow. This is expected until the package is associated with this repository: delete it at https://github.com/packages?package_type=container and let the next run recreate it. The Release workflow is strict about this, so a tagged release will fail loudly until then."
 
-      - name: Verify the published package is a multi-arch image index
+      - name: Verify the published artifacts are multi-arch image indexes
         if: steps.publish.outcome == 'success'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           org="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
-          image="ghcr.io/${org}/provider-zitadel:${GITHUB_REF##*/}"
-          echo "==> ${image}"
-          platforms="$(docker buildx imagetools inspect "${image}" --format '{{range .Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
-          echo "${platforms}"
-          for p in linux/amd64 linux/arm64; do
-            case "${platforms}" in
-              *"${p}"*) ;;
-              *) echo "::error::${image} is missing the ${p} platform"; exit 1 ;;
-            esac
+          for ref in "ghcr.io/${org}/provider-zitadel:${VERSION}" "ghcr.io/${org}/provider-zitadel:controller-${VERSION}"; do
+            echo "==> ${ref}"
+            platforms="$(docker buildx imagetools inspect "${ref}" --format '{{range .Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
+            echo "${platforms}"
+            for p in linux/amd64 linux/arm64; do
+              case "${platforms}" in
+                *"${p}"*) ;;
+                *) echo "::error::${ref} is missing the ${p} platform"; exit 1 ;;
+              esac
+            done
           done

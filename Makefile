@@ -167,6 +167,13 @@ dev-clean: $(KIND) $(KUBECTL)
 # ====================================================================================
 # Special Targets
 
+# Print the version this build would be published under. CI needs it to address
+# the artifacts it just pushed: make publish tags them with the version derived
+# from git, not with the branch name, so a verification step cannot assume
+# BRANCH_NAME.
+print-version:
+	@echo $(VERSION)
+
 # Sign the published package with a keyless cosign signature, exactly like the
 # release workflow does. Requires a GitHub OIDC token, so it only works inside
 # GitHub Actions (or with COSIGN_EXPERIMENTAL and a suitable ambient token).
