@@ -122,12 +122,26 @@ jobs:
         env:
           BUILD_ARGS: "--load"
 
+      # A GITHUB_TOKEN may only push to a GHCR package that is associated with
+      # the repository this workflow runs in. The association is established by
+      # the org.opencontainers.image.source label on an image pushed from this
+      # repository, which `make publish` does first. If the package already
+      # exists and was created outside of this repository, the association is
+      # missing and every push is rejected with 403 - which is a confusing
+      # failure, so it is called out here.
+      - name: Check that the GHCR package can be pushed to
+        run: |
+          set -euo pipefail
+          if docker buildx imagetools inspect "${IMAGE}:v0.0.0-canary" >/dev/null 2>&1; then
+            echo "::notice::${IMAGE} already exists."
+          fi
+          echo "::notice::The first push associates ${IMAGE} with ${GITHUB_REPOSITORY}. If it fails with 403 Forbidden, the package was created outside of this repository: make it public, or delete it in https://github.com/packages?package_type=container so the next run recreates it."
+
       - name: Publish Artifacts
         run: make publish BRANCH_NAME=${GITHUB_REF##*/}
         env:
           VERSION: ${{ github.ref_name }}
           XPKG_REG_ORGS: ghcr.io/${{ github.repository_owner }}
-          REGISTRY_ORGS: ""
 
       - name: Resolve and record the package digest
         id: meta
@@ -155,40 +169,47 @@ jobs:
             echo "Digest: \`${digest}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Sign the image index, not the tag: a signature has to cover the exact
-      # bytes a consumer pulls. This is the signature Crossplane itself checks
-      # when package signature verification is enabled.
-      - name: Sign the package (keyless)
+      # Sign the image indexes, not the tags: a signature has to cover the exact
+      # bytes a consumer pulls. The package signature is the one Crossplane
+      # itself checks when package signature verification is enabled.
+      - name: Sign the package and the controller image (keyless)
+        env:
+          CERT_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/release.yml@refs/tags/${{ github.ref_name }}
         run: |
           set -euo pipefail
-          cosign sign --yes "${IMAGE}@${{ steps.meta.outputs.digest }}"
+          controller="${IMAGE}:controller-${GITHUB_REF_NAME}"
+          controller_digest="$(crane digest "${controller}")"
+          for ref in "${IMAGE}@${{ steps.meta.outputs.digest }}" "${controller}@${controller_digest}"; do
+            echo "::group::Sign ${ref}"
+            cosign sign --yes "${ref}"
+            echo "::endgroup::"
+            cosign verify \
+              --certificate-identity "${CERT_IDENTITY}" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+              "${ref}"
+          done
+          echo "controller_digest=${controller_digest}" >> "$GITHUB_OUTPUT"
+        id: sign
 
       - name: Attest the build provenance
         run: |
           set -euo pipefail
           cosign attest --yes --type slsaprovenance \
-            "${IMAGE}@${{ steps.meta.outputs.digest }}"
+            "${IMAGE}:controller-${GITHUB_REF_NAME}@${{ steps.sign.outputs.controller_digest }}"
 
-      - name: Verify the signature
-        env:
-          CERT_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/release.yml@refs/tags/${{ github.ref_name }}
+      - name: Verify both artifacts are multi-arch image indexes
         run: |
           set -euo pipefail
-          cosign verify \
-            --certificate-identity "${CERT_IDENTITY}" \
-            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            "${IMAGE}@${{ steps.meta.outputs.digest }}"
-
-      - name: Verify the package is a multi-arch image index
-        run: |
-          set -euo pipefail
-          platforms="$(docker buildx imagetools inspect "${IMAGE}:${GITHUB_REF_NAME}" --format '{{range .Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
-          echo "${platforms}"
-          for p in linux/amd64 linux/arm64; do
-            case "${platforms}" in
-              *"${p}"*) ;;
-              *) echo "::error::${IMAGE}:${GITHUB_REF_NAME} is missing the ${p} platform"; exit 1 ;;
-            esac
+          for ref in "${IMAGE}:${GITHUB_REF_NAME}" "${IMAGE}:controller-${GITHUB_REF_NAME}"; do
+            echo "==> ${ref}"
+            platforms="$(docker buildx imagetools inspect "${ref}" --format '{{range .Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}')"
+            echo "${platforms}"
+            for p in linux/amd64 linux/arm64; do
+              case "${platforms}" in
+                *"${p}"*) ;;
+                *) echo "::error::${ref} is missing the ${p} platform"; exit 1 ;;
+              esac
+            done
           done
 
       - name: Promote to the stable channel
@@ -197,12 +218,25 @@ jobs:
           VERSION: ${{ github.ref_name }}
           CHANNEL: stable
           XPKG_REG_ORGS: ghcr.io/${{ github.repository_owner }}
-          REGISTRY_ORGS: ""
 
-      - name: Sign the stable channel
+      - name: Sign the promoted channels
+        env:
+          CERT_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/release.yml@refs/tags/${{ github.ref_name }}
         run: |
           set -euo pipefail
-          cosign sign --yes "${IMAGE}:stable@$(crane digest "${IMAGE}:stable")"
+          for ref in \
+            "${IMAGE}:stable" \
+            "${IMAGE}:${GITHUB_REF_NAME}-stable" \
+            "${IMAGE}:controller-stable" \
+            "${IMAGE}:controller-${GITHUB_REF_NAME}-stable"; do
+            echo "::group::Sign ${ref}"
+            cosign sign --yes "${ref}@$(crane digest "${ref}")"
+            cosign verify \
+              --certificate-identity "${CERT_IDENTITY}" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+              "${ref}@$(crane digest "${ref}")"
+            echo "::endgroup::"
+          done
 
   # Proves that a consumer can verify the published package without any
   # repository-local knowledge beyond the workflow identity.

@@ -51,7 +51,6 @@ jobs:
           VERSION: ${{ github.event.inputs.version }}
           CHANNEL: ${{ github.event.inputs.channel }}
           XPKG_REG_ORGS: ghcr.io/${{ github.repository_owner }}
-          REGISTRY_ORGS: ""
 
       - name: Verify the promoted package is a multi-arch image index
         run: |

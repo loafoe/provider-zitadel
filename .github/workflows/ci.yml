@@ -246,6 +246,12 @@ jobs:
           name: output
           path: _output/**
 
+      # A GITHUB_TOKEN may only push to a GHCR package associated with this
+      # repository. `make publish` establishes the association with the labelled
+      # controller image it pushes first. If the package already exists and was
+      # created outside of this repository, the association is missing and the
+      # push is rejected with 403; that is a one time fix, see the README.
+      #
       # Branch builds are deliberately NOT signed: a cluster with package
       # signature verification enabled must install a release tag, which
       # .github/workflows/release.yml signs. Signing here as well would let a
@@ -254,7 +260,6 @@ jobs:
         run: make publish BRANCH_NAME=${GITHUB_REF##*/}
         env:
           XPKG_REG_ORGS: ghcr.io/${{ github.repository_owner }}
-          REGISTRY_ORGS: ""
 
       - name: Verify the published package is a multi-arch image index
         run: |

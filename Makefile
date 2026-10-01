@@ -7,6 +7,16 @@ PROJECT_REPO := github.com/loafoe/$(PROJECT_NAME)
 PLATFORMS ?= linux_amd64 linux_arm64
 -include build/makelib/common.mk
 
+# The GitHub repository this provider is published from, derived from the origin
+# remote. Used for the registry org, the image labels and the cosign identity.
+GITHUB_REPO := $(shell git config --get remote.origin.url | sed -E 's|^git@github.com[:/]||; s|^https://github.com/||; s|\.git$$||')
+GITHUB_OWNER := $(word 1,$(subst /, ,$(GITHUB_REPO)))
+
+# The image build runs in a sub-make, which needs these to label the image with
+# its source repository.
+export PROJECT_NAME
+export PROJECT_REPO
+
 # The build submodule only publishes artifacts when BRANCH_NAME matches
 # RELEASE_BRANCH_FILTER, which by default only lists branches. This provider
 # also releases from version tags, so the filter has to match v* too -
@@ -48,12 +58,20 @@ test.run: go.test.unit.fixed
 # ====================================================================================
 # Setup Images
 
-# The controller images are built per platform (the xpkg embeds them) but never
-# published on their own: a Crossplane v2 package doubles as its own runtime
-# image, so a standalone image under the same tag would overwrite the package.
-# XPKG_REG_ORGS below is what actually gets pushed.
+# Two artifacts come out of a release:
+#
+#   * ghcr.io/<owner>/provider-zitadel:<tag>            the Crossplane package,
+#     a multi-arch image index. This is what you install, and it embeds a
+#     controller image per platform, so it doubles as its own runtime.
+#   * ghcr.io/<owner>/provider-zitadel:controller-<tag> the standalone
+#     multi-arch controller image. The "controller-" prefix matters: a
+#     Crossplane v2 package doubles as its own runtime, so an image on the
+#     package tag would overwrite the package.
+#
+# The controller image push is also what associates the GHCR package with this
+# repository, which is what makes the workflow token able to push the package.
 IMAGES = provider-zitadel
-REGISTRY_ORGS ?=
+REGISTRY_ORGS ?= ghcr.io/$(GITHUB_OWNER)
 -include build/makelib/imagelight.mk
 
 # ====================================================================================
@@ -67,8 +85,6 @@ COSIGN := $(TOOLS_HOST_DIR)/cosign-v$(COSIGN_VERSION)
 # The keyless identity of the release workflow. This is what ends up in the
 # Fulcio certificate of the signature, and what Crossplane matches on through
 # examples/imageconfig-signature-verification.yaml.
-GITHUB_REPO := $(shell git config --get remote.origin.url | sed -E 's|^git@github.com[:/]||; s|^https://github.com/||; s|\.git$$||')
-GITHUB_OWNER := $(word 1,$(subst /, ,$(GITHUB_REPO)))
 COSIGN_CERT_IDENTITY ?= https://github.com/$(GITHUB_REPO)/.github/workflows/release.yml@refs/tags/$(VERSION)
 COSIGN_CERT_ISSUER ?= https://token.actions.githubusercontent.com
 COSIGN_OCI_REPO ?= ghcr.io/$(GITHUB_OWNER)/$(PROJECT_NAME)
@@ -76,7 +92,7 @@ COSIGN_OCI_REPO ?= ghcr.io/$(GITHUB_OWNER)/$(PROJECT_NAME)
 # ====================================================================================
 # Setup XPKG
 
-XPKG_REG_ORGS ?= ghcr.io/loafoe
+XPKG_REG_ORGS ?= ghcr.io/$(GITHUB_OWNER)
 # Channel tags (":stable") only exist on registries that do not infer vanity
 # tags from the tag, so nothing is excluded here. Leaving this empty matters:
 # a stale value silently turns `make promote` into a no-op.

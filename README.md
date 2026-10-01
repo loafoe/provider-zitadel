@@ -11,7 +11,7 @@ readable Go controller per managed resource, and it uses the modern Zitadel
 
 | | |
 |---|---|
-| Provider package | `ghcr.io/loafoe/provider-zitadel` |
+| Provider package | `ghcr.io/loafoe/provider-zitadel` (multi-arch, cosigned) |
 | Managed resource group | `zitadel.m.crossplane.io/v1alpha1` |
 | Provider config group | `zitadel.crossplane.io/v1alpha1` |
 | Platforms | `linux/amd64`, `linux/arm64` (multi-arch OCI image) |
@@ -241,13 +241,19 @@ Pushing a `v*` tag runs
 
 1. runs `make reviewable` and `make build.all` — every platform is built and the
    multi-arch package is assembled;
-2. publishes the package to `ghcr.io/loafoe/provider-zitadel:<tag>` as a
-   **multi-arch OCI image index** covering `linux/amd64` and `linux/arm64`;
-3. signs the image index with a **keyless cosign signature** (Fulcio
-   certificate + Rekor transparency log entry) using the GitHub Actions OIDC
-   identity, and emits a SLSA provenance attestation;
-4. verifies the signature, verifies that both platforms are present, and finally
-   promotes the release to the `:stable` channel and signs that too.
+2. publishes two artifacts, both **multi-arch OCI image indexes** covering
+   `linux/amd64` and `linux/arm64`:
+
+   | Reference | What it is |
+   |---|---|
+   | `ghcr.io/loafoe/provider-zitadel:<tag>` | The Crossplane package. This is what you install. |
+   | `ghcr.io/loafoe/provider-zitadel:controller-<tag>` | The standalone controller image, for running the provider out of cluster. |
+
+3. signs both with a **keyless cosign signature** (Fulcio certificate + Rekor
+   transparency log entry) using the GitHub Actions OIDC identity, and emits a
+   SLSA provenance attestation;
+4. verifies the signatures, verifies that both platforms are present, then
+   promotes to the `:stable` channel — and signs every channel tag too.
 
 A second job then re-verifies the published signature from scratch, using only
 the workflow identity — i.e. it proves a consumer can verify the package without
@@ -262,17 +268,41 @@ cosign verify \
   ghcr.io/loafoe/provider-zitadel:v0.1.0
 ```
 
-or `make verify-signature VERSION=v0.1.0`.
+or `make verify-signature VERSION=v0.1.0`. `make sign VERSION=v0.1.0` is the
+signing half, for when you need to re-sign from a different runner.
 
 ### The package is the runtime image
 
 A Crossplane v2 provider package embeds its controller image: the xpkg is built
 with `--embed-runtime-image`, so `spec.controller.image` stays empty and the
-package image doubles as the runtime image. That is why only the package is
-published — pushing a standalone controller image under the same tag would
-overwrite the package. The multi-arch property is preserved end to end: the
-package index has one entry per platform, each embedding that platform's
-controller image.
+package image doubles as the runtime image. That is why the standalone
+controller image is tagged `controller-<tag>` rather than `<tag>` — a package and
+an image cannot share a tag. The multi-arch property holds end to end: the package
+index has one entry per platform, each embedding that platform's controller
+image.
+
+### One-time GitHub package setup
+
+A workflow's `GITHUB_TOKEN` may only push to a GHCR package that is **associated
+with the repository the workflow runs in**. The association is established by the
+`org.opencontainers.image.source` label on an image pushed from that repository,
+which `make publish` does first by publishing the labelled controller image.
+
+If the package already exists but was created outside of this repository (for
+example pushed from a laptop with a personal token), the association is missing
+and every CI push fails with `403 Forbidden` on the existing blobs. Fix it once,
+either way:
+
+* make the package public in
+  [GitHub's package settings](https://github.com/packages?package_type=container),
+  or
+* delete it there, and let the next CI run recreate it — which links it to the
+  repository and, because this account defaults to public package visibility,
+  makes it public in one go.
+
+Branch builds pushed by `ci.yml` are deliberately **not** signed. A cluster with
+package signature verification enabled must install a `v*` tag, and signing a
+mutable branch ref would let it stand in for a release.
 
 ### Enforcing signature verification in a cluster
 
