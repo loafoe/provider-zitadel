@@ -1,0 +1,32 @@
+# Set the colours and theme of an organization's login pages.
+#
+# This is a singleton: one resource describes the policy of one organization,
+# and deleting it puts the organization back on the instance default rather than
+# removing anything.
+#
+# Every field is optional. A field left unset is not compared against Zitadel,
+# so its default is never fought over.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: LabelPolicy
+metadata:
+  name: platform-branding
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    organizationRef: {name: platform}
+    primaryColor: "#5282C1"
+    warnColor: "#F4A300"
+    backgroundColor: "#FFFFFF"
+    fontColor: "#1A1A1A"
+    primaryColorDark: "#3C6EA5"
+    warnColorDark: "#D18F00"
+    backgroundColorDark: "#121212"
+    fontColorDark: "#F5F5F5"
+    hideLoginNameSuffix: false
+    disableWatermark: true
+    themeMode: "Auto"
+
+# The logo, favicon and custom font are uploaded to Zitadel outside its
+# API, so this provider reports where they are served from but never
+# sets or removes them. Their URLs appear in status.atProvider.

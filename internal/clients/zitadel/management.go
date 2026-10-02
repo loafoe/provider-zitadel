@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	adminapi "github.com/zitadel/zitadel-go/v3/pkg/client/admin"
 	"github.com/zitadel/zitadel-go/v3/pkg/client/management"
 	"github.com/zitadel/zitadel-go/v3/pkg/client/zitadel"
 	appv1 "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/app"
@@ -238,5 +239,52 @@ func TokenTypeToV1(t string) (appv1.OIDCTokenType, error) {
 		return appv1.OIDCTokenType_OIDC_TOKEN_TYPE_JWT, nil
 	default:
 		return appv1.OIDCTokenType_OIDC_TOKEN_TYPE_BEARER, fmt.Errorf("unsupported OIDC token type %q", t)
+	}
+}
+
+// adminClientForOrg returns a v1 admin API client scoped to orgID, creating it
+// on first use.
+//
+// Most of the admin API is instance scoped and the shared client serves it. The
+// domain policy and the custom policies are the exception: their requests carry
+// no organization, so the organization travels on the connection and the client
+// has to be built per organization.
+func (c *Client) adminClientForOrg(ctx context.Context, orgID string) (*adminapi.Client, error) {
+	if orgID == "" {
+		return c.admin, nil
+	}
+
+	c.adminMu.Lock()
+	defer c.adminMu.Unlock()
+
+	if ac, ok := c.adminPerOrg[orgID]; ok {
+		return ac, nil
+	}
+
+	opts := append([]zitadelOption{}, c.options...)
+	opts = append(opts, withOrgID(orgID))
+
+	ac, err := adminapi.NewClient(ctx, c.issuer, c.api, defaultScopes(), opts...)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create the Zitadel admin client for organization %s: %w", orgID, err)
+	}
+
+	if c.adminPerOrg == nil {
+		c.adminPerOrg = map[string]*adminapi.Client{}
+	}
+
+	c.adminPerOrg[orgID] = ac
+
+	return ac, nil
+}
+
+// CloseAdmins releases the cached per organization admin API clients.
+func (c *Client) CloseAdmins() {
+	c.adminMu.Lock()
+	defer c.adminMu.Unlock()
+
+	for orgID, ac := range c.adminPerOrg {
+		_ = ac.Connection.Close()
+		delete(c.adminPerOrg, orgID)
 	}
 }

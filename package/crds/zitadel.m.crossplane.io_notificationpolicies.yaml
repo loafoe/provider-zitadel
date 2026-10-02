@@ -4,7 +4,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
-  name: loginpolicies.zitadel.m.crossplane.io
+  name: notificationpolicies.zitadel.m.crossplane.io
 spec:
   group: zitadel.m.crossplane.io
   names:
@@ -12,40 +12,33 @@ spec:
     - crossplane
     - managed
     - zitadel
-    kind: LoginPolicy
-    listKind: LoginPolicyList
-    plural: loginpolicies
-    singular: loginpolicy
+    kind: NotificationPolicy
+    listKind: NotificationPolicyList
+    plural: notificationpolicies
+    singular: notificationpolicy
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .status.conditions[?(@.type=='Synced')].status
-      name: SYNCED
-      type: string
-    - jsonPath: .status.conditions[?(@.type=='Ready')].status
-      name: READY
-      type: string
     - jsonPath: .status.atProvider.organizationID
-      name: ORGANIZATION
+      name: Organization
       type: string
     - jsonPath: .status.atProvider.isDefault
-      name: DEFAULT
-      type: boolean
-    - jsonPath: .status.atProvider.allowRegister
-      name: REGISTER
+      name: Default
       type: boolean
     - jsonPath: .metadata.creationTimestamp
-      name: AGE
+      name: Age
       type: date
     name: v1alpha1
     schema:
       openAPIV3Schema:
         description: |-
-          // A LoginPolicy is an organization's login and authentication policy: whether
-          self registration is allowed, whether MFA is forced, how long a password
-          change is accepted for. Zitadel keeps exactly one per organization, so this
-          resource is a singleton and deleting it reverts the organization to the
-          instance default rather than removing a policy.
+          A NotificationPolicy is an organization's notification policy.
+
+          controls which events make Zitadel send an email.
+
+          It is a singleton: one resource describes the policy of one
+          organization, and deleting it puts the organization back on the
+          instance default rather than removing anything.
         properties:
           apiVersion:
             description: |-
@@ -65,94 +58,21 @@ spec:
           metadata:
             type: object
           spec:
-            description: A LoginPolicySpec defines the desired state of a LoginPolicy.
+            description: NotificationPolicySpec defines the desired state of a NotificationPolicy.
             properties:
               forProvider:
-                description: LoginPolicyParameters are the configurable fields of
-                  a LoginPolicy.
+                description: NotificationPolicyParameters are the configurable fields
+                  of a NotificationPolicy.
                 properties:
-                  allowDomainDiscovery:
-                    description: |-
-                      AllowDomainDiscovery lets a login name without a domain be matched
-                      against verified domains.
-                    type: boolean
-                  allowExternalIDP:
-                    description: AllowExternalIDP allows login through an upstream
-                      identity provider.
-                    type: boolean
-                  allowRegister:
-                    description: AllowRegister allows users to register themselves.
-                    type: boolean
-                  allowUsernamePassword:
-                    description: AllowUsernamePassword allows login with a username
-                      and password.
-                    type: boolean
-                  defaultRedirectURI:
-                    description: DefaultRedirectURI is where a login lands when no
-                      redirect is requested.
-                    type: string
-                  disableLoginWithEmail:
-                    description: DisableLoginWithEmail disables login with an email
-                      address.
-                    type: boolean
-                  disableLoginWithPhone:
-                    description: DisableLoginWithPhone disables login with a phone
-                      number.
-                    type: boolean
-                  externalLoginCheckLifetime:
-                    description: |-
-                      ExternalLoginCheckLifetime is how long an upstream IdP link stays valid,
-                      e.g. "8760h".
-                    type: string
-                  forceMFA:
-                    description: ForceMFA requires multi factor authentication for
-                      every user.
-                    type: boolean
-                  forceMFALocalOnly:
-                    description: ForceMFALocalOnly requires MFA also for federated
-                      logins.
-                    type: boolean
-                  hidePasswordReset:
-                    description: HidePasswordReset hides the password reset option
-                      from the login UI.
-                    type: boolean
-                  idps:
-                    description: IDPs are the IDs of the identity providers offered
-                      on the login page.
-                    items:
-                      type: string
-                    type: array
-                  ignoreUnknownUsernames:
-                    description: |-
-                      IgnoreUnknownUsernames avoids leaking whether an account exists by
-                      answering the same way for an unknown and a wrong username.
-                    type: boolean
-                  mfaInitSkipLifetime:
-                    description: MFAInitSkipLifetime is how long MFA setup may be
-                      skipped, e.g. "720h".
-                    type: string
-                  multiFactorCheckLifetime:
-                    description: |-
-                      MultiFactorCheckLifetime is how long a multi factor stays valid, e.g.
-                      "8760h".
-                    type: string
-                  multiFactors:
-                    description: MultiFactors are the multi factors users may use.
-                    items:
-                      description: MultiFactor types Zitadel accepts as a multi authentication
-                        factor.
-                      enum:
-                      - U2FWithVerification
-                      type: string
-                    type: array
                   organizationID:
                     description: |-
-                      OrganizationID is the ID of the organization. Either `organizationID`,
+                      The ID of the organization the policy belongs to. Either `organizationID`,
                       `organizationRef` or `organizationSelector` must be set.
                     type: string
                   organizationRef:
-                    description: OrganizationRef references an Organization managed
-                      by this provider.
+                    description: |-
+                      OrganizationRef references an Organization managed by this provider and
+                      uses its ID.
                     properties:
                       name:
                         description: Name of the referenced object.
@@ -186,8 +106,9 @@ spec:
                     - name
                     type: object
                   organizationSelector:
-                    description: OrganizationSelector selects an Organization managed
-                      by this provider.
+                    description: |-
+                      OrganizationSelector selects an Organization managed by this provider and
+                      uses its ID.
                     properties:
                       matchControllerRef:
                         description: |-
@@ -226,36 +147,9 @@ spec:
                             type: string
                         type: object
                     type: object
-                  passwordCheckLifetime:
-                    description: |-
-                      PasswordCheckLifetime is how long a password change is accepted for,
-                      e.g. "8760h".
-                    type: string
-                  passwordlessType:
-                    description: PasswordlessType selects whether passwordless login
-                      is allowed.
-                    enum:
-                    - Allowed
-                    - NotAllowed
-                    type: string
-                  secondFactorCheckLifetime:
-                    description: |-
-                      SecondFactorCheckLifetime is how long a second factor stays valid, e.g.
-                      "8760h".
-                    type: string
-                  secondFactors:
-                    description: SecondFactors are the second factors users may use.
-                    items:
-                      description: SecondFactor types Zitadel accepts as a second
-                        authentication factor.
-                      enum:
-                      - OTP
-                      - U2F
-                      - OTPEmail
-                      - OTPSMS
-                      - RecoveryCodes
-                      type: string
-                    type: array
+                  passwordChange:
+                    description: Send a notification when a user changes their password.
+                    type: boolean
                 type: object
               managementPolicies:
                 default:
@@ -316,130 +210,32 @@ spec:
             - forProvider
             type: object
           status:
-            description: A LoginPolicyStatus represents the observed state of a LoginPolicy.
+            description: NotificationPolicyStatus is the observed state of a NotificationPolicy.
             properties:
               atProvider:
-                description: LoginPolicyObservation are the observable fields of a
-                  LoginPolicy.
+                description: NotificationPolicyObservation is what the notification
+                  policy of an organization currently is.
                 properties:
-                  allowDomainDiscovery:
-                    description: |-
-                      AllowDomainDiscovery lets a login name without a domain be matched
-                      against verified domains.
-                    type: boolean
-                  allowExternalIDP:
-                    description: AllowExternalIDP allows login through an upstream
-                      identity provider.
-                    type: boolean
-                  allowRegister:
-                    description: AllowRegister allows users to register themselves.
-                    type: boolean
-                  allowUsernamePassword:
-                    description: AllowUsernamePassword allows login with a username
-                      and password.
-                    type: boolean
-                  defaultRedirectURI:
-                    description: DefaultRedirectURI is where a login lands when no
-                      redirect is requested.
-                    type: string
-                  disableLoginWithEmail:
-                    description: DisableLoginWithEmail disables login with an email
-                      address.
-                    type: boolean
-                  disableLoginWithPhone:
-                    description: DisableLoginWithPhone disables login with a phone
-                      number.
-                    type: boolean
-                  externalLoginCheckLifetime:
-                    description: ExternalLoginCheckLifetime is how long an upstream
-                      IdP link stays valid.
-                    type: string
-                  forceMFA:
-                    description: ForceMFA requires multi factor authentication for
-                      every user.
-                    type: boolean
-                  forceMFALocalOnly:
-                    description: ForceMFALocalOnly requires MFA also for federated
-                      logins.
-                    type: boolean
-                  hidePasswordReset:
-                    description: HidePasswordReset hides the password reset option
-                      from the login UI.
-                    type: boolean
-                  idps:
-                    description: IDPs are the identity providers offered on the login
-                      page.
-                    items:
-                      type: string
-                    type: array
-                  ignoreUnknownUsernames:
-                    description: IgnoreUnknownUsernames avoids leaking whether an
-                      account exists.
-                    type: boolean
                   isDefault:
-                    description: |-
-                      IsDefault is true while the organization still uses the instance default
-                      policy.
+                    description: IsDefault is true while the organization still uses
+                      the instance default.
                     type: boolean
-                  mfaInitSkipLifetime:
-                    description: MFAInitSkipLifetime is how long MFA setup may be
-                      skipped.
-                    type: string
-                  multiFactorCheckLifetime:
-                    description: MultiFactorCheckLifetime is how long a multi factor
-                      stays valid.
-                    type: string
-                  multiFactors:
-                    description: MultiFactors are the multi factors users may use.
-                    items:
-                      description: MultiFactor types Zitadel accepts as a multi authentication
-                        factor.
-                      enum:
-                      - U2FWithVerification
-                      type: string
-                    type: array
                   organizationID:
                     description: OrganizationID is the organization the policy belongs
                       to.
                     type: string
-                  passwordCheckLifetime:
-                    description: PasswordCheckLifetime is how long a password change
-                      is accepted for.
-                    type: string
-                  passwordlessType:
-                    description: PasswordlessType selects whether passwordless login
-                      is allowed.
-                    enum:
-                    - Allowed
-                    - NotAllowed
-                    type: string
+                  passwordChange:
+                    description: Send a notification when a user changes their password.
+                    type: boolean
                   restore:
                     description: |-
-                      Restore is the policy this resource overwrote, kept so that deleting it can
-                      put the previous value back. Only used for a policy Zitadel cannot reset.
+                      The policy this resource overwrote, kept so that deleting it can put the
+                      previous value back. Only used for a policy Zitadel cannot reset.
                     format: byte
                     type: string
                   scope:
-                    description: Scope is the organization the policy was last read
-                      from.
+                    description: The organization the policy was last read from.
                     type: string
-                  secondFactorCheckLifetime:
-                    description: SecondFactorCheckLifetime is how long a second factor
-                      stays valid.
-                    type: string
-                  secondFactors:
-                    description: SecondFactors are the second factors users may use.
-                    items:
-                      description: SecondFactor types Zitadel accepts as a second
-                        authentication factor.
-                      enum:
-                      - OTP
-                      - U2F
-                      - OTPEmail
-                      - OTPSMS
-                      - RecoveryCodes
-                      type: string
-                    type: array
                 type: object
               conditions:
                 description: Conditions of the resource.

@@ -14,19 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package loginpolicy implements the controller for the LoginPolicy managed
-// resource - an organization's login and authentication policy.
 package loginpolicy
 
 import (
 	"context"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
-	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,166 +31,49 @@ import (
 	"github.com/loafoe/provider-zitadel/internal/controller/common"
 )
 
-const errNotLoginPolicy = "managed resource is not a LoginPolicy custom resource"
-
 // Setup adds a controller that reconciles LoginPolicy managed resources.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
-	return common.SetupManagedResourceController(
+	return common.SetupPolicyController(
 		mgr, o,
 		v1alpha1.LoginPolicyGroupKind,
 		v1alpha1.LoginPolicyGroupVersionKind,
 		&v1alpha1.LoginPolicy{},
 		&v1alpha1.LoginPolicyList{},
-		newExternal,
+		driver{},
 	)
 }
 
-type external struct {
-	kube   client.Client
-	client *zitadel.Client
-}
+// driver is everything specific to the login policy. The lifecycle around it -
+// when the policy exists, what counts as drift, what deleting it means - is the
+// shared policy harness's, because every Zitadel policy behaves that way.
+type driver struct{}
 
-func newExternal(_ context.Context, kube client.Client, _ resource.ModernManaged, zc *zitadel.Client) (managed.ExternalClient, error) {
-	return &external{kube: kube, client: zc}, nil
-}
+var _ common.PolicyDriver[zitadel.LoginPolicyInput, zitadel.LoginPolicy] = driver{}
 
-// Observe reports whether the organization has a custom login policy and
-// whether it matches the desired state.
-func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
-	cr, ok := mg.(*v1alpha1.LoginPolicy)
+// Kind names the policy, for errors and events.
+func (driver) Kind() string { return "LoginPolicy" }
+
+// Scope resolves the organization the policy belongs to. A login policy is always
+// an organization's own, so an unresolved reference is an error rather than a
+// request for the instance default.
+func (driver) Scope(ctx context.Context, kube client.Client, cr common.ManagedPolicy) (string, error) {
+	policy, ok := cr.(*v1alpha1.LoginPolicy)
 	if !ok {
-		return managed.ExternalObservation{}, errors.New(errNotLoginPolicy)
+		return "", errors.New("managed resource is not a LoginPolicy custom resource")
 	}
 
-	orgID, err := e.organizationID(ctx, cr)
-	if err != nil {
-		if meta.WasDeleted(cr) {
-			// Nothing resolves while an object is terminating, so report the
-			// external resource as gone. That lets the reconciler run Delete,
-			// which lets the finalizer go, instead of retrying an observation
-			// that can never succeed.
-			return managed.ExternalObservation{ResourceExists: false}, nil
-		}
+	fp := policy.Spec.ForProvider
 
-		return managed.ExternalObservation{}, err
-	}
-
-	// Zitadel keeps exactly one login policy per organization, so the
-	// organization is the external name.
-	if meta.GetExternalName(cr) == "" {
-		meta.SetExternalName(cr, orgID)
-	}
-
-	p, err := e.client.GetLoginPolicy(ctx, orgID)
-	if err != nil {
-		if zitadel.IsNotFound(err) {
-			return managed.ExternalObservation{ResourceExists: false}, nil
-		}
-		return managed.ExternalObservation{}, errors.Wrap(err, "cannot get the login policy from Zitadel")
-	}
-
-	// While the organization still uses the instance default, the policy is
-	// reported as not existing so that it is created.
-	if p.IsDefault {
-		return managed.ExternalObservation{ResourceExists: false}, nil
-	}
-
-	updateStatus(cr, orgID, p)
-	cr.Status.SetConditions(xpv1.Available())
-
-	return managed.ExternalObservation{
-		ResourceExists:   true,
-		ResourceUpToDate: isUpToDate(cr, p),
-	}, nil
-}
-
-// Create installs a custom login policy for the organization.
-func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	cr, ok := mg.(*v1alpha1.LoginPolicy)
-	if !ok {
-		return managed.ExternalCreation{}, errors.New(errNotLoginPolicy)
-	}
-
-	cr.Status.SetConditions(xpv1.Creating())
-
-	orgID, err := e.organizationID(ctx, cr)
-	if err != nil {
-		return managed.ExternalCreation{}, err
-	}
-
-	if err := e.client.SetLoginPolicy(ctx, orgID, desired(cr)); err != nil {
-		return managed.ExternalCreation{}, err
-	}
-
-	meta.SetExternalName(cr, orgID)
-
-	return managed.ExternalCreation{}, nil
-}
-
-// Update applies the changed fields of the login policy.
-func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	_, ok := mg.(*v1alpha1.LoginPolicy)
-	if !ok {
-		return managed.ExternalUpdate{}, errors.New(errNotLoginPolicy)
-	}
-
-	cr := mg.(*v1alpha1.LoginPolicy)
-
-	// SetLoginPolicy distinguishes create from update itself and reconciles the
-	// factor lists by diffing them, so Create and Update are the same call.
-	orgID, err := e.organizationID(ctx, cr)
-	if err != nil {
-		return managed.ExternalUpdate{}, err
-	}
-
-	if err := e.client.SetLoginPolicy(ctx, orgID, desired(cr)); err != nil {
-		return managed.ExternalUpdate{}, err
-	}
-
-	return managed.ExternalUpdate{}, nil
-}
-
-// Delete reverts the organization to the instance default login policy.
-// Zitadel has no way to remove a custom policy, so reverting is the closest
-// equivalent to a delete and is what an operator means by it.
-func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
-	cr, ok := mg.(*v1alpha1.LoginPolicy)
-	if !ok {
-		return managed.ExternalDelete{}, errors.New(errNotLoginPolicy)
-	}
-
-	cr.Status.SetConditions(xpv1.Deleting())
-
-	if common.NeverCreated(cr.Status.AtProvider.OrganizationID) {
-		// Nothing was ever created in Zitadel, so there is nothing to detach
-		// from. Returning success lets the finalizer go instead of leaving the
-		// object stuck.
-		return managed.ExternalDelete{}, nil
-	}
-
-	if err := e.client.ResetLoginPolicy(ctx, common.Deref(cr.Status.AtProvider.OrganizationID)); err != nil {
-		return managed.ExternalDelete{}, err
-	}
-
-	return managed.ExternalDelete{}, nil
-}
-
-// Disconnect releases the underlying Zitadel client.
-func (e *external) Disconnect(ctx context.Context) error {
-	return e.client.Close()
-}
-
-// organizationID resolves the organization the policy belongs to.
-func (e *external) organizationID(ctx context.Context, cr *v1alpha1.LoginPolicy) (string, error) {
-	fp := cr.Spec.ForProvider
-
-	orgDefault, err := common.ProviderConfigOrganizationID(ctx, e.kube, cr)
+	orgDefault, err := common.ProviderConfigOrganizationID(ctx, kube, policy)
 	if err != nil {
 		return "", common.Join(common.ErrNoOrganizationID, err)
 	}
 
-	orgID, err := common.ResolveOrganizationID(ctx, e.kube, cr, fp.OrganizationRef, fp.OrganizationSelector, fp.OrganizationID, orgDefault,
-		common.CurrentIfDeleting(meta.WasDeleted(cr), cr.Status.AtProvider.OrganizationID))
+	// A terminating object acts on the organization it recorded: it exists to
+	// reset the policy it set, not to reset one belonging to a replacement.
+	orgID, err := common.ResolveOrganizationID(ctx, kube, policy, fp.OrganizationRef,
+		fp.OrganizationSelector, fp.OrganizationID, orgDefault,
+		common.CurrentIfDeleting(meta.WasDeleted(policy), policy.Status.AtProvider.OrganizationID))
 	if err != nil {
 		return "", common.Join(common.ErrNoOrganizationID, err)
 	}
@@ -205,6 +83,50 @@ func (e *external) organizationID(ctx context.Context, cr *v1alpha1.LoginPolicy)
 	}
 
 	return orgID, nil
+}
+
+// Get reads the organization's login policy.
+func (driver) Get(ctx context.Context, c *zitadel.Client, scope string) (zitadel.LoginPolicy, bool, error) {
+	p, err := c.GetLoginPolicy(ctx, scope)
+	if err != nil {
+		return zitadel.LoginPolicy{}, false, err
+	}
+
+	return *p, p.IsDefault, nil
+}
+
+// Apply writes the login policy, adding or updating it as Zitadel requires.
+//
+// Zitadel answers the read for an organization that has never customised its
+// policy, reporting the instance default, and then rejects the update because
+// there is no custom policy to update. SetLoginPolicy adds in that case and
+// updates otherwise, which is why the two are not separate driver operations.
+func (driver) Apply(ctx context.Context, c *zitadel.Client, scope string, want zitadel.LoginPolicyInput) error {
+	return c.SetLoginPolicy(ctx, scope, want)
+}
+
+// Resettable reports that deleting this resource can put the organization back
+// on the instance default, which is how Zitadel removes a custom policy.
+func (driver) Resettable() bool { return true }
+
+// Reset puts the organization back on the instance default login policy.
+func (driver) Reset(ctx context.Context, c *zitadel.Client, scope string) error {
+	return c.ResetLoginPolicy(ctx, scope)
+}
+
+// Desired reads the desired policy out of the managed resource.
+func (driver) Desired(cr common.ManagedPolicy) zitadel.LoginPolicyInput {
+	return desired(cr.(*v1alpha1.LoginPolicy))
+}
+
+// Report writes the observed policy into the managed resource's status.
+func (driver) Report(cr common.ManagedPolicy, observed zitadel.LoginPolicy) {
+	updateStatus(cr.(*v1alpha1.LoginPolicy), observed)
+}
+
+// Equal reports whether the observed policy already matches the desired one.
+func (driver) Equal(want zitadel.LoginPolicyInput, got zitadel.LoginPolicy) bool {
+	return samePolicy(want, &got)
 }
 
 // desired translates the spec into the client input, applying the documented
@@ -261,28 +183,38 @@ func valueOr(b *bool, fallback bool) bool {
 	return *b
 }
 
-// isUpToDate reports whether the remote policy matches the desired state.
-//
-// Zitadel normalises durations, so "8760h" and "365d" are the same policy and
-// are compared as durations rather than as strings.
-//
-//nolint:gocyclo // flat comparison of every policy field
-func isUpToDate(cr *v1alpha1.LoginPolicy, p *zitadel.LoginPolicy) bool {
-	want := desired(cr)
+// samePolicy reports whether an observed login policy already matches the
+// desired one.
+func samePolicy(want zitadel.LoginPolicyInput, p *zitadel.LoginPolicy) bool {
+	for _, f := range []struct {
+		name      string
+		want, got bool
+	}{
+		{"allowUsernamePassword", want.AllowUsernamePassword, p.AllowUsernamePassword},
+		{"allowRegister", want.AllowRegister, p.AllowRegister},
+		{"allowExternalIDP", want.AllowExternalIDP, p.AllowExternalIDP},
+		{"forceMFA", want.ForceMFA, p.ForceMFA},
+		{"forceMFALocalOnly", want.ForceMFALocalOnly, p.ForceMFALocalOnly},
+		{"hidePasswordReset", want.HidePasswordReset, p.HidePasswordReset},
+		{"ignoreUnknownUsernames", want.IgnoreUnknownUsernames, p.IgnoreUnknownUsernames},
+		{"allowDomainDiscovery", want.AllowDomainDiscovery, p.AllowDomainDiscovery},
+		{"disableLoginWithEmail", want.DisableLoginWithEmail, p.DisableLoginWithEmail},
+		{"disableLoginWithPhone", want.DisableLoginWithPhone, p.DisableLoginWithPhone},
+	} {
+		if f.want != f.got {
+			return false
+		}
+	}
 
-	if want.AllowUsernamePassword != p.AllowUsernamePassword ||
-		want.AllowRegister != p.AllowRegister ||
-		want.AllowExternalIDP != p.AllowExternalIDP ||
-		want.ForceMFA != p.ForceMFA ||
-		want.ForceMFALocalOnly != p.ForceMFALocalOnly ||
-		want.HidePasswordReset != p.HidePasswordReset ||
-		want.IgnoreUnknownUsernames != p.IgnoreUnknownUsernames ||
-		want.AllowDomainDiscovery != p.AllowDomainDiscovery ||
-		want.DisableLoginWithEmail != p.DisableLoginWithEmail ||
-		want.DisableLoginWithPhone != p.DisableLoginWithPhone ||
-		want.DefaultRedirectURI != p.DefaultRedirectURI ||
-		want.PasswordlessType != p.PasswordlessType {
-		return false
+	for _, f := range []struct {
+		name, want, got string
+	}{
+		{"defaultRedirectURI", want.DefaultRedirectURI, p.DefaultRedirectURI},
+		{"passwordlessType", want.PasswordlessType, p.PasswordlessType},
+	} {
+		if f.want != f.got {
+			return false
+		}
 	}
 
 	for _, d := range []struct{ want, got string }{
@@ -297,19 +229,11 @@ func isUpToDate(cr *v1alpha1.LoginPolicy, p *zitadel.LoginPolicy) bool {
 		}
 	}
 
-	if !sameStringSet(want.IDPs, p.IDPs) {
-		return false
-	}
-
-	wantSecond := want.SecondFactors
-	if !sameStringSet(wantSecond, p.SecondFactors) {
-		return false
-	}
-
-	return sameStringSet(want.MultiFactors, p.MultiFactors)
+	return sameStringSet(want.IDPs, p.IDPs) &&
+		sameStringSet(want.SecondFactors, p.SecondFactors) &&
+		sameStringSet(want.MultiFactors, p.MultiFactors)
 }
 
-// sameDuration compares two duration strings as durations.
 func sameDuration(a, b string) bool {
 	if a == b {
 		return true
@@ -363,8 +287,7 @@ func sameStringSet(a, b []string) bool {
 }
 
 // updateStatus copies the observed policy into the status of cr.
-func updateStatus(cr *v1alpha1.LoginPolicy, orgID string, p *zitadel.LoginPolicy) {
-	cr.Status.AtProvider.OrganizationID = common.StringPtr(orgID)
+func updateStatus(cr *v1alpha1.LoginPolicy, p zitadel.LoginPolicy) {
 	cr.Status.AtProvider.IsDefault = common.BoolPtr(p.IsDefault)
 	cr.Status.AtProvider.AllowUsernamePassword = common.BoolPtr(p.AllowUsernamePassword)
 	cr.Status.AtProvider.AllowRegister = common.BoolPtr(p.AllowRegister)

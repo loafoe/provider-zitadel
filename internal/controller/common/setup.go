@@ -176,16 +176,3 @@ func NeverCreated(ids ...*string) bool {
 
 	return false
 }
-
-// NeverCreated covers the two ways a managed resource can be deleted without an
-// external identity:
-//
-//   - its Create never succeeded, so there is nothing in Zitadel to detach from;
-//   - it is terminating, and the crossplane reference resolver refuses to
-//     re-resolve references while an object is being deleted, so resolving from
-//     the spec alone would fail.
-//
-// In both cases Delete returns success and lets the finalizer go. Without this a
-// single failed Create leaves the object stuck in Terminating forever, because
-// the delete that has to clean it up depends on the very resolution that keeps
-// failing.

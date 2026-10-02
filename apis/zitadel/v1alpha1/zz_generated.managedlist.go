@@ -17,6 +17,15 @@ func (l *ApplicationAPIList) GetItems() []resource.Managed {
 	return items
 }
 
+// GetItems of this DomainPolicyList.
+func (l *DomainPolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
 // GetItems of this HumanUserList.
 func (l *HumanUserList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
@@ -35,6 +44,24 @@ func (l *InstanceMemberList) GetItems() []resource.Managed {
 	return items
 }
 
+// GetItems of this LabelPolicyList.
+func (l *LabelPolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this LockoutPolicyList.
+func (l *LockoutPolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
 // GetItems of this LoginPolicyList.
 func (l *LoginPolicyList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
@@ -46,6 +73,15 @@ func (l *LoginPolicyList) GetItems() []resource.Managed {
 
 // GetItems of this MachineKeyList.
 func (l *MachineKeyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this NotificationPolicyList.
+func (l *NotificationPolicyList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]
@@ -89,8 +125,35 @@ func (l *OrganizationMetadataList) GetItems() []resource.Managed {
 	return items
 }
 
+// GetItems of this PasswordAgePolicyList.
+func (l *PasswordAgePolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this PasswordComplexityPolicyList.
+func (l *PasswordComplexityPolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
 // GetItems of this PersonalAccessTokenList.
 func (l *PersonalAccessTokenList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this PrivacyPolicyList.
+func (l *PrivacyPolicyList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]

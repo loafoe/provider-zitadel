@@ -1,0 +1,20 @@
+# Control how login names relate to an organization's domains.
+#
+# This is a singleton: one resource describes the policy of one organization,
+# and deleting it puts the organization back on the instance default rather than
+# removing anything.
+#
+# Every field is optional. A field left unset is not compared against Zitadel,
+# so its default is never fought over.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: DomainPolicy
+metadata:
+  name: platform-domains
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    organizationRef: {name: platform}
+    userLoginMustBeDomain: false
+    validateOrgDomains: false
+    smtpSenderAddressMatchesInstanceDomain: true

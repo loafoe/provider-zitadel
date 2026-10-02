@@ -23,15 +23,22 @@ import (
 
 	"github.com/loafoe/provider-zitadel/internal/controller/apiapplication"
 	"github.com/loafoe/provider-zitadel/internal/controller/config"
+	"github.com/loafoe/provider-zitadel/internal/controller/domain_policy"
 	"github.com/loafoe/provider-zitadel/internal/controller/humanuser"
 	"github.com/loafoe/provider-zitadel/internal/controller/instancemember"
+	"github.com/loafoe/provider-zitadel/internal/controller/label_policy"
+	"github.com/loafoe/provider-zitadel/internal/controller/lockout_policy"
 	"github.com/loafoe/provider-zitadel/internal/controller/loginpolicy"
 	"github.com/loafoe/provider-zitadel/internal/controller/machinekey"
+	"github.com/loafoe/provider-zitadel/internal/controller/notification_policy"
 	"github.com/loafoe/provider-zitadel/internal/controller/oidcapplication"
 	"github.com/loafoe/provider-zitadel/internal/controller/organization"
 	"github.com/loafoe/provider-zitadel/internal/controller/organizationmetadata"
 	"github.com/loafoe/provider-zitadel/internal/controller/orgmember"
+	"github.com/loafoe/provider-zitadel/internal/controller/password_age_policy"
+	"github.com/loafoe/provider-zitadel/internal/controller/password_complexity_policy"
 	"github.com/loafoe/provider-zitadel/internal/controller/personalaccesstoken"
+	"github.com/loafoe/provider-zitadel/internal/controller/privacy_policy"
 	"github.com/loafoe/provider-zitadel/internal/controller/project"
 	"github.com/loafoe/provider-zitadel/internal/controller/projectgrant"
 	"github.com/loafoe/provider-zitadel/internal/controller/projectgrantmember"
@@ -72,7 +79,18 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		// Attributes and policy.
 		usermetadata.Setup,
 		organizationmetadata.Setup,
+
+		// Organization policy. Every one of these is a singleton of one
+		// organization; see internal/controller/common/policy.go for the
+		// lifecycle they share.
 		loginpolicy.Setup,
+		lockout_policy.Setup,
+		notification_policy.Setup,
+		password_age_policy.Setup,
+		password_complexity_policy.Setup,
+		privacy_policy.Setup,
+		domain_policy.Setup,
+		label_policy.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err

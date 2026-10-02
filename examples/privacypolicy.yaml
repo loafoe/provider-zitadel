@@ -1,0 +1,24 @@
+# Set the legal and support links Zitadel shows.
+#
+# This is a singleton: one resource describes the policy of one organization,
+# and deleting it puts the organization back on the instance default rather than
+# removing anything.
+#
+# Every field is optional. A field left unset is not compared against Zitadel,
+# so its default is never fought over.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: PrivacyPolicy
+metadata:
+  name: platform-privacy
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    organizationRef: {name: platform}
+    tosLink: "https://example.com/tos"
+    privacyLink: "https://example.com/privacy"
+    helpLink: "https://example.com/help"
+    supportEmail: "support@example.com"
+    docsLink: "https://example.com/docs"
+    customLink: "https://example.com/status"
+    customLinkText: "Status"

@@ -19,6 +19,7 @@ package common
 import (
 	"context"
 	"errors"
+	"math"
 	"strings"
 	"time"
 
@@ -413,4 +414,44 @@ func CurrentIfDeleting(deleting bool, observed *string) string {
 	}
 
 	return Deref(observed)
+}
+
+// DerefBool returns the value p points at, or false when p is nil.
+func DerefBool(p *bool) bool {
+	if p == nil {
+		return false
+	}
+
+	return *p
+}
+
+// DerefInt64 returns the value p points at, or zero when p is nil.
+func DerefInt64(p *int64) int64 {
+	if p == nil {
+		return 0
+	}
+
+	return *p
+}
+
+// Int64Ptr returns a pointer to i.
+func Int64Ptr(i int64) *int64 { return &i }
+
+// ToUint32 narrows a count from a spec into the uint32 the Zitadel API accepts.
+//
+// Every such field is an attempt count, a day count or a minimum length, which
+// no real configuration approaches the limit. Saturating rather than wrapping is
+// what makes a nonsensical value visible as an extreme setting rather than as a
+// small plausible one, and the CRD constrains the field to a non-negative value
+// so the ordinary range is unaffected.
+func ToUint32(v int64) uint32 {
+	if v < 0 {
+		return 0
+	}
+
+	if v > math.MaxUint32 {
+		return math.MaxUint32
+	}
+
+	return uint32(v) //nolint:gosec // Bounded by the checks above.
 }

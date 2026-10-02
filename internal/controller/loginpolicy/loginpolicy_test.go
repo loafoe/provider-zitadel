@@ -111,8 +111,8 @@ func matchingPolicy(p v1alpha1.LoginPolicyParameters) v1alpha1.LoginPolicyParame
 	return p
 }
 
-func TestIsUpToDate(t *testing.T) {
-	remote := &zitadel.LoginPolicy{
+func TestSamePolicy(t *testing.T) {
+	observed := &zitadel.LoginPolicy{
 		AllowUsernamePassword:  true,
 		AllowRegister:          true,
 		AllowExternalIDP:       true,
@@ -193,8 +193,8 @@ func TestIsUpToDate(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			cr := &v1alpha1.LoginPolicy{Spec: v1alpha1.LoginPolicySpec{ForProvider: tc.fp}}
-			if got := isUpToDate(cr, remote); got != tc.want {
-				t.Errorf("\n%s\nisUpToDate(...): want %v, got %v", tc.reason, tc.want, got)
+			if got := samePolicy(desired(cr), observed); got != tc.want {
+				t.Errorf("\n%ssamePolicy(...): want %v, got %v", tc.reason, tc.want, got)
 			}
 		})
 	}
@@ -306,13 +306,13 @@ func TestIsUpToDateAgainstObservedPolicy(t *testing.T) {
 		},
 	}}
 
-	if !isUpToDate(cr, observed) {
+	if !samePolicy(desired(cr), observed) {
 		t.Errorf("policy matching the spec reported as drift:\nwant %+v\ngot  %+v", desired(cr), *observed)
 	}
 
 	// A real change must still be detected.
 	observed.ForceMFA = true
-	if isUpToDate(cr, observed) {
+	if samePolicy(desired(cr), observed) {
 		t.Error("a changed forceMFA reported as up to date")
 	}
 }

@@ -218,6 +218,15 @@ type LoginPolicyObservation struct {
 	// IDPs are the identity providers offered on the login page.
 	// +optional
 	IDPs []string `json:"idps,omitempty"`
+
+	// Scope is the organization the policy was last read from.
+	// +optional
+	Scope *string `json:"scope,omitempty"`
+
+	// Restore is the policy this resource overwrote, kept so that deleting it can
+	// put the previous value back. Only used for a policy Zitadel cannot reset.
+	// +optional
+	Restore []byte `json:"restore,omitempty"`
 }
 
 // A LoginPolicySpec defines the desired state of a LoginPolicy.
@@ -276,3 +285,15 @@ var (
 func init() {
 	SchemeBuilder.Register(&LoginPolicy{}, &LoginPolicyList{})
 }
+
+// SetPolicyScope records the organization the policy belongs to.
+func (mg *LoginPolicy) SetPolicyScope(scope string) { mg.Status.AtProvider.Scope = StringPtr(scope) }
+
+// PolicyScope returns the organization the policy was last read from.
+func (mg *LoginPolicy) PolicyScope() string { return Deref(mg.Status.AtProvider.Scope) }
+
+// SetPolicyRestore records the policy to put back when this resource is deleted.
+func (mg *LoginPolicy) SetPolicyRestore(restore []byte) { mg.Status.AtProvider.Restore = restore }
+
+// PolicyRestore returns the recorded restore point.
+func (mg *LoginPolicy) PolicyRestore() []byte { return mg.Status.AtProvider.Restore }

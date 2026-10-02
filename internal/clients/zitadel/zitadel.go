@@ -103,9 +103,14 @@ type Client struct {
 	application *apiv2.Client
 	org         *orgv2.Client
 
-	// The v1 admin API is instance scoped and is the only API that manages
-	// instance memberships (IAM roles).
-	admin *adminapi.Client
+	// The v1 admin API is the only API that manages instance memberships (IAM
+	// roles), instance settings and the domain policy. Most of it is instance
+	// scoped, but the domain policy and the custom policies take an organization
+	// through the connection, so those clients are created per organization and
+	// cached the same way the management ones are.
+	admin       *adminapi.Client
+	adminPerOrg map[string]*adminapi.Client
+	adminMu     sync.Mutex
 
 	// The v1 management API is organization scoped and needs a connection per
 	// organization, so its clients are created lazily and cached here. See
@@ -340,11 +345,14 @@ func IsNotChanged(err error) bool {
 		return false
 	}
 
-	// Zitadel spells this differently per API version: the v2 management API
-	// says "No changes" and the v1 one a "NotChanged" error code.
+	// Zitadel spells this differently per endpoint: some say "No changes", some
+	// carry a "NotChanged" error code, and the private label policy phrases it
+	// as "has not been changed".
 	msg := st.Message()
 
-	return strings.Contains(msg, "NotChanged") || strings.Contains(msg, "No changes")
+	return strings.Contains(msg, "NotChanged") ||
+		strings.Contains(msg, "No changes") ||
+		strings.Contains(msg, "has not been changed")
 }
 
 // grpcStatus extracts the gRPC status of an error.
@@ -440,4 +448,30 @@ func WrapError(err error) error {
 	}
 
 	return err
+}
+
+// IsAlreadyExists reports whether Zitadel refused a write because the thing
+// being written is already there.
+//
+// It matters when a policy is written for the first time: Zitadel reports an
+// organization as still on the instance default in some cases even though it
+// already holds a custom policy, and the write then fails as an "already
+// exists". Falling back to the update call is what makes creating a policy
+// idempotent rather than dependent on that flag being accurate.
+func IsAlreadyExists(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	st, ok := grpcStatus(err)
+	if !ok {
+		return false
+	}
+
+	if st.Code() == codes.AlreadyExists {
+		return true
+	}
+
+	// Some Zitadel errors carry an AlreadyExists sense but a precondition code.
+	return strings.Contains(st.Message(), "AlreadyExists")
 }
