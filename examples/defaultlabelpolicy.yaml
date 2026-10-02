@@ -1,0 +1,31 @@
+# Set the colours and theme an organization inherits for its login pages.
+#
+# This is an instance wide setting: there is one of each for the whole instance,
+# and every organization inherits it until it sets its own.
+#
+# Zitadel has no way to reset an instance wide policy - there is no default
+# beneath it - so deleting this resource does not remove anything. It writes back
+# whatever the policy was before this resource first changed it, which is
+# recorded in status.atProvider.restore.
+#
+# Every field is optional. A field left unset is not compared against Zitadel,
+# so its default is never fought over.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: DefaultLabelPolicy
+metadata:
+  name: instance-branding
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    primaryColor: "#5282C1"
+    warnColor: "#F4A300"
+    backgroundColor: "#FFFFFF"
+    fontColor: "#1A1A1A"
+    hideLoginNameSuffix: false
+    disableWatermark: true
+    themeMode: "Auto"
+
+# The logo, favicon and custom font are uploaded to Zitadel outside its
+# API, so this provider reports where they are served from but never
+# sets or removes them. Their URLs appear in status.atProvider.

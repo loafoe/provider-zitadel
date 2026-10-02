@@ -23,6 +23,16 @@ import (
 
 	"github.com/loafoe/provider-zitadel/internal/controller/apiapplication"
 	"github.com/loafoe/provider-zitadel/internal/controller/config"
+	"github.com/loafoe/provider-zitadel/internal/controller/default_domain_policy"
+	"github.com/loafoe/provider-zitadel/internal/controller/default_label_policy"
+	"github.com/loafoe/provider-zitadel/internal/controller/default_lockout_policy"
+	"github.com/loafoe/provider-zitadel/internal/controller/default_login_policy"
+	"github.com/loafoe/provider-zitadel/internal/controller/default_notification_policy"
+	"github.com/loafoe/provider-zitadel/internal/controller/default_oidc_settings"
+	"github.com/loafoe/provider-zitadel/internal/controller/default_password_age_policy"
+	"github.com/loafoe/provider-zitadel/internal/controller/default_password_complexity_policy"
+	"github.com/loafoe/provider-zitadel/internal/controller/default_privacy_policy"
+	"github.com/loafoe/provider-zitadel/internal/controller/default_security_settings"
 	"github.com/loafoe/provider-zitadel/internal/controller/domain_policy"
 	"github.com/loafoe/provider-zitadel/internal/controller/humanuser"
 	"github.com/loafoe/provider-zitadel/internal/controller/instancemember"
@@ -91,6 +101,19 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		privacy_policy.Setup,
 		domain_policy.Setup,
 		label_policy.Setup,
+
+		// The policies an organization inherits until it sets its own. These
+		// cannot be reset, so deleting one restores what it overwrote.
+		default_lockout_policy.Setup,
+		default_notification_policy.Setup,
+		default_password_age_policy.Setup,
+		default_password_complexity_policy.Setup,
+		default_privacy_policy.Setup,
+		default_domain_policy.Setup,
+		default_label_policy.Setup,
+		default_login_policy.Setup,
+		default_oidc_settings.Setup,
+		default_security_settings.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err

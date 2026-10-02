@@ -19,6 +19,7 @@ package common
 import (
 	"context"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -140,7 +141,7 @@ func TestObserveReportsAResetPolicyAsGone(t *testing.T) {
 // been terminating: resetting it is what makes it gone, and that has not
 // happened yet.
 func TestObserveReportsAnOwnedPolicyAsStillThere(t *testing.T) {
-	d := &testDriver{inherited: false, observed: zitadel.LockoutPolicy{MaxPasswordAttempts: 5}}
+	d := &testDriver{resettable: true, inherited: false, observed: zitadel.LockoutPolicy{MaxPasswordAttempts: 5}}
 	e := newTestExternal(d)
 
 	cr := testResource()
@@ -228,5 +229,48 @@ func TestUpdateDoesNotRecordARestorePointForAResettablePolicy(t *testing.T) {
 
 	if cr.PolicyRestore() != nil {
 		t.Error("a policy that can be reset recorded a restore point")
+	}
+}
+
+// A policy Zitadel cannot reset is restored rather than removed, so it never
+// becomes "absent" the way a reset one does. The recorded restore point is what
+// says whether the delete still has work to do.
+//
+// Reporting it as still there forever would leave the finalizer in place; the
+// opposite would let the finalizer go before the restore was ever written.
+func TestObserveTracksARestorePointThatStillHasToBeWritten(t *testing.T) {
+	d := &testDriver{resettable: false, observed: zitadel.LockoutPolicy{MaxPasswordAttempts: 9}}
+	e := newTestExternal(d)
+
+	cr := testResource()
+	cr.SetDeletionTimestamp(&metav1.Time{Time: time.Now()})
+	cr.SetPolicyRestore([]byte(`{"MaxPasswordAttempts":9}`))
+
+	got, err := e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !got.ResourceExists {
+		t.Error("a policy with a restore point still to write reported itself gone, so Delete would never run")
+	}
+
+	// Delete writes the recorded value back and clears the point, which is what
+	// tells Observe that there is nothing left to do.
+	if _, err := e.Delete(context.Background(), cr); err != nil {
+		t.Fatal(err)
+	}
+
+	if cr.PolicyRestore() != nil {
+		t.Fatal("delete left the restore point behind, so the policy would never be seen as gone")
+	}
+
+	got, err = e.Observe(context.Background(), cr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.ResourceExists {
+		t.Error("a policy whose recorded value has been written back still reports itself existing, so the finalizer is never released")
 	}
 }

@@ -198,11 +198,21 @@ func (e *policyExternal[P, O, CR]) Observe(ctx context.Context, mg resource.Mana
 	exists := true
 
 	if meta.WasDeleted(cr) {
-		// A policy is deleted by resetting it, so for a terminating resource
-		// inheriting the default again is what "gone" looks like. Without this
-		// the finalizer is never released: Crossplane waits for the external
-		// resource to disappear, and a reset policy never does.
-		exists = !inherited
+		switch {
+		case e.d.Resettable():
+			// A policy Zitadel can reset is gone once the scope is inheriting the
+			// default again. Without this the finalizer is never released:
+			// Crossplane waits for the external resource to disappear, and a
+			// reset policy never does.
+			exists = !inherited
+
+		default:
+			// One Zitadel cannot reset is restored rather than removed, and that
+			// happens in Delete. The recorded restore point outlives the delete
+			// that used it, so its presence both asks for that delete and reports
+			// that it has already happened.
+			exists = cr.PolicyRestore() != nil
+		}
 	}
 
 	return managed.ExternalObservation{

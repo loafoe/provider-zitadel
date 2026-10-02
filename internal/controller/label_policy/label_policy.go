@@ -83,32 +83,29 @@ func (driver) Scope(ctx context.Context, kube client.Client, cr common.ManagedPo
 	return orgID, nil
 }
 
-// Get reads the organization's branding policy.
+// Get reads the branding policy.
 func (driver) Get(ctx context.Context, c *zitadel.Client, scope string) (zitadel.LabelPolicy, bool, error) {
 	p, err := c.GetLabelPolicy(ctx, scope)
 	if err != nil {
 		return zitadel.LabelPolicy{}, false, err
 	}
 
-	return *p, p.IsDefault, nil
+	return *p, false, nil
 }
 
-// Apply writes the policy, adding or updating it as Zitadel requires.
-//
-// Zitadel separates adding a custom policy from updating one, and which to use
-// depends on whether the organization has one. The client works that out, so a
-// driver does not have to.
+// Apply writes the policy.
 func (driver) Apply(ctx context.Context, c *zitadel.Client, scope string, want zitadel.LabelPolicyInput) error {
 	return c.SetLabelPolicy(ctx, scope, want)
 }
 
-// Reset puts the organization back on the instance default branding policy.
-// Resettable reports that deleting this resource can put the organization
-// back on the instance default, which is how Zitadel removes a custom policy.
+// Resettable reports whether deleting this resource can put the %s
+// back the way it was by resetting it.
 func (driver) Resettable() bool { return true }
 
-func (driver) Reset(ctx context.Context, c *zitadel.Client, scope string) error {
-	return c.ResetLabelPolicy(ctx, scope)
+// Reset is only ever reached for a resettable policy, which an instance
+// wide one is not: Zitadel has no endpoint that clears it.
+func (driver) Reset(ctx context.Context, c *zitadel.Client, _ string) error {
+	return errors.New("the branding policy cannot be reset; deleting the resource restores what it overwrote")
 }
 
 // Desired reads the desired policy out of the managed resource.
@@ -148,8 +145,8 @@ func (driver) Report(mg common.ManagedPolicy, observed zitadel.LabelPolicy) {
 	cr.Status.AtProvider.HideLoginNameSuffix = common.BoolPtr(observed.HideLoginNameSuffix)
 	cr.Status.AtProvider.DisableWatermark = common.BoolPtr(observed.DisableWatermark)
 	if observed.ThemeMode != "" {
-		mode := v1alpha1.LabelThemeMode(observed.ThemeMode)
-		cr.Status.AtProvider.ThemeMode = &mode
+		value := v1alpha1.LabelThemeMode(observed.ThemeMode)
+		cr.Status.AtProvider.ThemeMode = &value
 	}
 	cr.Status.AtProvider.LogoURL = common.StringPtr(observed.LogoURL)
 	cr.Status.AtProvider.IconURL = common.StringPtr(observed.IconURL)
@@ -181,6 +178,18 @@ func (driver) Equal(want zitadel.LabelPolicyInput, observed zitadel.LabelPolicy)
 		want string
 		got  string
 	}{
+		{"ThemeMode", want.ThemeMode, observed.ThemeMode},
+	} {
+		if f.want != f.got {
+			return false
+		}
+	}
+
+	for _, f := range []struct {
+		name string
+		want string
+		got  string
+	}{
 		{"PrimaryColor", want.PrimaryColor, observed.PrimaryColor},
 		{"WarnColor", want.WarnColor, observed.WarnColor},
 		{"BackgroundColor", want.BackgroundColor, observed.BackgroundColor},
@@ -189,7 +198,6 @@ func (driver) Equal(want zitadel.LabelPolicyInput, observed zitadel.LabelPolicy)
 		{"WarnColorDark", want.WarnColorDark, observed.WarnColorDark},
 		{"BackgroundColorDark", want.BackgroundColorDark, observed.BackgroundColorDark},
 		{"FontColorDark", want.FontColorDark, observed.FontColorDark},
-		{"ThemeMode", want.ThemeMode, observed.ThemeMode},
 	} {
 		if f.want != f.got {
 			return false

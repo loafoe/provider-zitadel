@@ -455,3 +455,29 @@ func ToUint32(v int64) uint32 {
 
 	return uint32(v) //nolint:gosec // Bounded by the checks above.
 }
+
+// enumNames projects a slice of a named string type onto its plain values, so
+// that a spec field can be compared with the API spelling of the same setting
+// without the comparison depending on the generated type.
+//
+// A nil or empty slice becomes an empty, non-nil one, so that "not configured"
+// and "configured with nothing" compare the same way.
+func EnumNames[T ~string](values []T) []string {
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		out = append(out, string(v))
+	}
+
+	return out
+}
+
+// enumValues is enumNames in the other direction, for writing what Zitadel
+// reports back into a status field.
+func EnumValues[T ~string](values []string) []T {
+	out := make([]T, 0, len(values))
+	for _, v := range values {
+		out = append(out, T(v))
+	}
+
+	return out
+}

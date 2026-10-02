@@ -17,6 +17,96 @@ func (l *ApplicationAPIList) GetItems() []resource.Managed {
 	return items
 }
 
+// GetItems of this DefaultDomainPolicyList.
+func (l *DefaultDomainPolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this DefaultLabelPolicyList.
+func (l *DefaultLabelPolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this DefaultLockoutPolicyList.
+func (l *DefaultLockoutPolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this DefaultLoginPolicyList.
+func (l *DefaultLoginPolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this DefaultNotificationPolicyList.
+func (l *DefaultNotificationPolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this DefaultOIDCSettingsList.
+func (l *DefaultOIDCSettingsList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this DefaultPasswordAgePolicyList.
+func (l *DefaultPasswordAgePolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this DefaultPasswordComplexityPolicyList.
+func (l *DefaultPasswordComplexityPolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this DefaultPrivacyPolicyList.
+func (l *DefaultPrivacyPolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this DefaultSecuritySettingsList.
+func (l *DefaultSecuritySettingsList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
 // GetItems of this DomainPolicyList.
 func (l *DomainPolicyList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))

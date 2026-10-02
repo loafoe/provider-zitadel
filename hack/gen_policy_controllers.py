@@ -12,11 +12,10 @@ so they are generated from the same table the API types are generated from. That
 keeps a policy's spec, its status and its controller from drifting apart.
 """
 
-import re
 import sys
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
-from gen_policy_types import POLICIES  # noqa: E402
+from gen_policy_types import INSTANCE_POLICIES, POLICIES, snake_case  # noqa: E402
 
 LICENSE = """/*
 Copyright 2025 The Crossplane Authors.
@@ -60,13 +59,92 @@ NUMERIC = {"MaxPasswordAttempts", "MaxOTPAttempts", "MaxAgeDays",
            "ExpireWarnDays", "MinLength"}
 
 
+# Instance wide policies use the same client methods, with no scope argument.
+CLIENT.update({
+    "DefaultLockoutPolicy": ("DefaultLockoutPolicy", "DefaultLockoutPolicyInput",
+                             "GetDefaultLockoutPolicy", "SetDefaultLockoutPolicy", "ResetLockoutPolicy"),
+    "DefaultNotificationPolicy": ("DefaultNotificationPolicy", "DefaultNotificationPolicyInput",
+                                  "GetDefaultNotificationPolicy", "SetDefaultNotificationPolicy", "ResetNotificationPolicy"),
+    "DefaultPasswordAgePolicy": ("DefaultPasswordAgePolicy", "DefaultPasswordAgePolicyInput",
+                                 "GetDefaultPasswordAgePolicy", "SetDefaultPasswordAgePolicy", "ResetPasswordAgePolicy"),
+    "DefaultPasswordComplexityPolicy": ("DefaultPasswordComplexityPolicy", "DefaultPasswordComplexityPolicyInput",
+                                        "GetDefaultPasswordComplexityPolicy", "SetDefaultPasswordComplexityPolicy",
+                                        "ResetPasswordComplexityPolicy"),
+    "DefaultPrivacyPolicy": ("DefaultPrivacyPolicy", "DefaultPrivacyPolicyInput",
+                             "GetDefaultPrivacyPolicy", "SetDefaultPrivacyPolicy", "ResetPrivacyPolicy"),
+    "DefaultDomainPolicy": ("DefaultDomainPolicy", "DefaultDomainPolicyInput",
+                            "GetDefaultDomainPolicy", "SetDefaultDomainPolicy", "ResetDomainPolicy"),
+    "DefaultLabelPolicy": ("DefaultLabelPolicy", "DefaultLabelPolicyInput",
+                           "GetDefaultLabelPolicy", "SetDefaultLabelPolicy", "ResetLabelPolicy"),
+    "DefaultLoginPolicy": ("DefaultLoginPolicy", "DefaultLoginPolicyInput",
+                           "GetDefaultLoginPolicy", "SetDefaultLoginPolicy", "ResetLoginPolicy"),
+    "DefaultOIDCSettings": ("DefaultOIDCSettings", "DefaultOIDCSettingsInput",
+                            "GetDefaultOIDCSettings", "SetDefaultOIDCSettings", "ResetOIDCSettings"),
+    "DefaultSecuritySettings": ("DefaultSecuritySettings", "DefaultSecuritySettingsInput",
+                                "GetDefaultSecuritySettings", "SetDefaultSecuritySettings", "ResetSecuritySettings"),
+})
+
+# Scope resolution is the one part of a policy that differs by scope, so it is
+# written out once per kind of scope rather than branched inline.
+SCOPE_ORGANIZATION = [
+    "// Scope resolves the organization the policy belongs to. A policy is always",
+    "// an organization's own, so an unresolved reference is an error rather than a",
+    "// request for the instance default.",
+    "func (driver) Scope(ctx context.Context, kube client.Client, cr common.ManagedPolicy) (string, error) {",
+    "\tpolicy, ok := cr.(*v1alpha1.KIND)",
+    "\tif !ok {",
+    "\t\treturn \"\", errors.New(\"managed resource is not a KIND custom resource\")",
+    "\t}",
+    "",
+    "\tfp := policy.Spec.ForProvider",
+    "",
+    "\torgDefault, err := common.ProviderConfigOrganizationID(ctx, kube, policy)",
+    "\tif err != nil {",
+    "\t\treturn \"\", common.Join(common.ErrNoOrganizationID, err)",
+    "\t}",
+    "",
+    "\t// A terminating object acts on the organization it recorded: it exists to",
+    "\t// reset the policy it set, not one belonging to a replacement.",
+    "\torgID, err := common.ResolveOrganizationID(ctx, kube, policy, fp.OrganizationRef,",
+    "\t\tfp.OrganizationSelector, fp.OrganizationID, orgDefault,",
+    "\t\tcommon.CurrentIfDeleting(meta.WasDeleted(policy), policy.Status.AtProvider.OrganizationID))",
+    "\tif err != nil {",
+    "\t\treturn \"\", common.Join(common.ErrNoOrganizationID, err)",
+    "\t}",
+    "",
+    "\tif orgID == \"\" {",
+    "\t\treturn \"\", errors.New(common.ErrNoOrganizationID.Error())",
+    "\t}",
+    "",
+    "\treturn orgID, nil",
+    "}",
+    "",
+]
+
+SCOPE_INSTANCE = [
+    "// Scope resolves to the empty string, which is how the shared harness tells an",
+    "// instance wide policy from an organization's own: there is no organization, and",
+    "// so nothing to resolve.",
+    "func (driver) Scope(_ context.Context, _ client.Client, _ common.ManagedPolicy) (string, error) {",
+    "\treturn \"\", nil",
+    "}",
+    "",
+]
+
+
+def scope(body, kind):
+    """Fill a scope body in with the kind it belongs to."""
+    return [line.replace("KIND", kind) for line in body]
+
+
 def snake(name):
-    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
+    return snake_case(name)
 
 
 def render(p):
     kind = p["kind"]
-    observed, inp, get, set_, reset = CLIENT[kind]
+    observed, inp, get, set_ = CLIENT[kind][:4]
+    instance = p["scope"] == "instance"
 
     # Only the policy's own fields appear in both the spec and the status; the
     # organization reference does not.
@@ -74,51 +152,76 @@ def render(p):
 
     def spec_expr(f):
         n = f["name"]
+        t = f["type"]
+
         if n.endswith("URL"):
             return '""'
-        if n in NUMERIC:
+
+        if n in NUMERIC or t == "*int64":
             return "common.ToUint32(common.DerefInt64(fp.%s))" % n
-        if f["type"] == "*int64":
-            return "common.DerefInt64(fp.%s)" % n
-        if f["type"] == "*bool":
+
+        if t == "*bool":
             return "common.DerefBool(fp.%s)" % n
-        if f["type"] == "*LabelThemeMode":
+
+        # A named string type - a theme mode, a passwordless type - is read
+        # through the same generic helper, which returns a plain string.
+        if t.startswith("*") and t.lstrip("*") not in ("string",):
             return "common.Value(fp.%s)" % n
+
+        if t == "[]string":
+            return "fp.%s" % n
+
+        # An enum slice is projected onto the API spelling here, so that the
+        # comparison below and the client never depend on the generated types.
+        if t.startswith("[]"):
+            return "common.EnumNames(fp.%s)" % n
+
         return "common.Deref(fp.%s)" % n
 
     def observed_expr(f):
-        n = f["name"]
-        if n in NUMERIC:
-            return "int64(observed.%s)" % n
-        return "observed.%s" % n
+        return "observed." + f["name"]
 
     def status_expr(f):
         n = f["name"]
-        if n in NUMERIC:
+        t = f["type"]
+
+        if n in NUMERIC or t == "*int64":
             return "cr.Status.AtProvider.%s = common.Int64Ptr(int64(observed.%s))" % (n, n)
 
-        if f["type"] == "*int64":
-            return "cr.Status.AtProvider.%s = common.Int64Ptr(int64(observed.%s))" % (n, n)
-
-        if f["type"] == "*bool":
+        if t == "*bool":
             return "cr.Status.AtProvider.%s = common.BoolPtr(observed.%s)" % (n, n)
 
-        if f["type"] == "*LabelThemeMode":
-            mode = "LabelThemeMode(observed.%s)" % n
-            return ("if observed.%s != \"\" {\n\t\tmode := v1alpha1.%s\n"
-                    "\t\tcr.Status.AtProvider.%s = &mode\n\t}") % (n, mode, n)
+        if t == "[]string":
+            return "cr.Status.AtProvider.%s = observed.%s" % (n, n)
+
+        if t.startswith("[]"):
+            return ("cr.Status.AtProvider.%s = common.EnumValues[v1alpha1.%s](observed.%s)"
+                    % (n, f["type"].lstrip("[]"), n))
+
+        if t.startswith("*") and t.lstrip("*") != "string":
+            mode = "v1alpha1.%s(observed.%s)" % (t.lstrip("*"), n)
+            return ("if observed.%s != \"\" {\n\t\tvalue := %s\n"
+                    "\t\tcr.Status.AtProvider.%s = &value\n\t}") % (n, mode, n)
 
         return "cr.Status.AtProvider.%s = common.StringPtr(observed.%s)" % (n, n)
 
     def compare(f):
         n = f["name"]
-        if f["type"] == "*LabelThemeMode":
-            return "want.%s != observed.%s" % (n, n)
+        if f["type"].startswith("[]"):
+            return "!common.EqualStringSlices(want.%s, observed.%s)" % (n, n)
         return "want.%s != observed.%s" % (n, n)
+
+    org_status = "" if instance else "\tcr.Status.AtProvider.OrganizationID = common.StringPtr(observed.OrgID)"
+
+    # An instance wide getter and setter take no scope.
+    arg = "" if instance else "scope, "
+
+    meta_import = "" if instance else '\t"github.com/crossplane/crossplane-runtime/v2/pkg/meta"\n'
+    meta_import = "" if instance else '\t"github.com/crossplane/crossplane-runtime/v2/pkg/meta"\n'
 
     out = [LICENSE, "", "package " + snake(kind), "", "import (", '\t"context"', "",
            '\t"github.com/crossplane/crossplane-runtime/v2/pkg/controller"',
-           '\t"github.com/crossplane/crossplane-runtime/v2/pkg/meta"',
+           meta_import.rstrip("\n"),
            '\t"github.com/pkg/errors"', '\tctrl "sigs.k8s.io/controller-runtime"',
            '\t"sigs.k8s.io/controller-runtime/pkg/client"', "",
            '\t"github.com/loafoe/provider-zitadel/apis/zitadel/v1alpha1"',
@@ -144,64 +247,36 @@ def render(p):
            "// Kind names the policy, for errors and events.",
            "func (driver) Kind() string { return \"%s\" }" % kind,
            "",
-           "// Scope resolves the organization the policy belongs to. A policy is always",
-           "// an organization's own, so an unresolved reference is an error rather than a",
-           "// request for the instance default.",
-           "func (driver) Scope(ctx context.Context, kube client.Client, cr common.ManagedPolicy) (string, error) {",
-           "\tpolicy, ok := cr.(*v1alpha1.%s)" % kind,
-           "\tif !ok {",
-           "\t\treturn \"\", errors.New(\"managed resource is not a %s custom resource\")" % kind,
-           "\t}",
            "",
-           "\tfp := policy.Spec.ForProvider",
-           "",
-           "\torgDefault, err := common.ProviderConfigOrganizationID(ctx, kube, policy)",
-           "\tif err != nil {",
-           "\t\treturn \"\", common.Join(common.ErrNoOrganizationID, err)",
-           "\t}",
-           "",
-           "\t// A terminating object acts on the organization it recorded: it exists to",
-           "\t// reset the policy it set, not one belonging to a replacement.",
-           "\torgID, err := common.ResolveOrganizationID(ctx, kube, policy, fp.OrganizationRef,",
-           "\t\tfp.OrganizationSelector, fp.OrganizationID, orgDefault,",
-           "\t\tcommon.CurrentIfDeleting(meta.WasDeleted(policy), policy.Status.AtProvider.OrganizationID))",
-           "\tif err != nil {",
-           "\t\treturn \"\", common.Join(common.ErrNoOrganizationID, err)",
-           "\t}",
-           "",
-           "\tif orgID == \"\" {",
-           "\t\treturn \"\", errors.New(common.ErrNoOrganizationID.Error())",
-           "\t}",
-           "",
-           "\treturn orgID, nil",
-           "}",
-           "",
-           "// Get reads the organization's %s." % p["title"],
+           ]
+
+    out += scope(SCOPE_INSTANCE if instance else SCOPE_ORGANIZATION, kind)
+
+    out += [
+
+           "// Get reads the %s." % p["title"],
            "func (driver) Get(ctx context.Context, c *zitadel.Client, scope string) (zitadel.%s, bool, error) {" % observed,
-           "\tp, err := c.%s(ctx, scope)" % get,
+           "\tp, err := c.%s(ctx%s)" % (get, ", scope" if not instance else ""),
            "\tif err != nil {",
            "\t\treturn zitadel.%s{}, false, err" % observed,
            "\t}",
            "",
-           "\treturn *p, p.IsDefault, nil",
+           "\treturn *p, false, nil",
            "}",
            "",
-           "// Apply writes the policy, adding or updating it as Zitadel requires.",
-           "//",
-           "// Zitadel separates adding a custom policy from updating one, and which to use",
-           "// depends on whether the organization has one. The client works that out, so a",
-           "// driver does not have to.",
+           "// Apply writes the policy.",
            "func (driver) Apply(ctx context.Context, c *zitadel.Client, scope string, want zitadel.%s) error {" % inp,
-           "\treturn c.%s(ctx, scope, want)" % set_,
+           "\treturn c.%s(ctx, %swant)" % (set_, arg),
            "}",
            "",
-           "// Reset puts the organization back on the instance default %s." % p["title"],
-           "// Resettable reports that deleting this resource can put the organization",
-           "// back on the instance default, which is how Zitadel removes a custom policy.",
-           "func (driver) Resettable() bool { return true }",
+           "// Resettable reports whether deleting this resource can put the %s",
+           "// back the way it was by resetting it.",
+           "func (driver) Resettable() bool { return %s }" % ("false" if instance else "true"),
            "",
-           "func (driver) Reset(ctx context.Context, c *zitadel.Client, scope string) error {",
-           "\treturn c.%s(ctx, scope)" % reset,
+           "// Reset is only ever reached for a resettable policy, which an instance",
+           "// wide one is not: Zitadel has no endpoint that clears it.",
+           "func (driver) Reset(ctx context.Context, c *zitadel.Client, _ string) error {",
+           "\treturn errors.New(\"the %s cannot be reset; deleting the resource restores what it overwrote\")" % p["title"],
            "}",
            "",
            "// Desired reads the desired policy out of the managed resource.",
@@ -218,8 +293,8 @@ def render(p):
             "func (driver) Report(mg common.ManagedPolicy, observed zitadel.%s) {" % observed,
             "\tcr := mg.(*v1alpha1.%s)" % kind,
             "",
-            "\tcr.Status.AtProvider.OrganizationID = common.StringPtr(observed.OrgID)",
-            "\tcr.Status.AtProvider.IsDefault = common.BoolPtr(observed.IsDefault)",
+            org_status,
+            "\tcr.Status.AtProvider.IsDefault = common.BoolPtr(%s)" % ("false" if instance else "observed.IsDefault"),
             ""]
     for f in fields:
         out.append("\t" + status_expr(f))
@@ -237,8 +312,18 @@ def render(p):
     compared = [f for f in fields if not f["name"].endswith("URL")]
 
     def table(items, go_type):
+        """Emit a comparison over a list of fields of one Go type.
+
+        A slice field needs a set comparison rather than an equality one, so the
+        comparison is spelled out per table instead of being hard coded.
+        """
         if not items:
             return []
+
+        slices = go_type.startswith("[]")
+        cmp_ = ("!common.EqualStringSlices(f.want, f.got)" if slices
+                else "f.want != f.got")
+
         rows = ["\tfor _, f := range []struct {",
                 "\t\tname string",
                 "\t\twant %s" % go_type,
@@ -246,18 +331,29 @@ def render(p):
                 "\t}{"]
         for f in items:
             rows.append('\t\t{"%s", want.%s, observed.%s},' % (f["name"], f["name"], f["name"]))
-        rows += ["\t} {", "\t\tif f.want != f.got {", "\t\t\treturn false", "\t\t}", "\t}", ""]
+        rows += ["\t} {", "\t\tif %s {" % cmp_, "\t\t\treturn false", "\t\t}", "\t}", ""]
         return rows
 
     def is_bool(f):
         return f["type"] == "*bool"
 
     def is_num(f):
-        return f["name"] in NUMERIC
+        return f["name"] in NUMERIC or f["type"] == "*int64"
+
+    def is_list(f):
+        return f["type"].startswith("[]")
+
+    def is_enum(f):
+        # A named string type, such as a theme mode or a passwordless type.
+        # Booleans and counts are named types too, and are handled above.
+        return (f["type"].startswith("*") and f["type"].lstrip("*") not in ("string", "bool", "int64"))
 
     out += table([f for f in compared if is_bool(f)], "bool")
     out += table([f for f in compared if is_num(f)], "uint32")
-    out += table([f for f in compared if not is_bool(f) and not is_num(f)], "string")
+    out += table([f for f in compared if is_enum(f)], "string")
+    out += table([f for f in compared if not is_bool(f) and not is_num(f)
+                  and not is_enum(f) and not is_list(f)], "string")
+    out += table([f for f in compared if is_list(f)], "[]string")
     out += ["\treturn true", "}", ""]
 
     text = "\n".join(out)
@@ -273,7 +369,7 @@ def render(p):
 if __name__ == "__main__":
     import os
     out_dir = sys.argv[1]
-    for p in POLICIES:
+    for p in POLICIES + INSTANCE_POLICIES:
         d = os.path.join(out_dir, snake(p["kind"]))
         os.makedirs(d, exist_ok=True)
         path = os.path.join(d, snake(p["kind"]) + ".go")

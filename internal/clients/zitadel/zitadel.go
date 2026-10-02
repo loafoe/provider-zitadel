@@ -39,6 +39,7 @@ import (
 	projectv2 "github.com/zitadel/zitadel-go/v3/pkg/client/project/v2"
 	userv2 "github.com/zitadel/zitadel-go/v3/pkg/client/user/v2"
 	"github.com/zitadel/zitadel-go/v3/pkg/client/zitadel"
+	settingsapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/settings/v2"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -102,6 +103,11 @@ type Client struct {
 	project     *projectv2.Client
 	application *apiv2.Client
 	org         *orgv2.Client
+
+	// The v2 settings service is the only Zitadel surface that reads and writes
+	// the instance wide security settings.
+	settings     settingsapi.SettingsServiceClient
+	settingsConn *zitadel.Connection
 
 	// The v1 admin API is the only API that manages instance memberships (IAM
 	// roles), instance settings and the domain policy. Most of it is instance
@@ -248,16 +254,28 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 	}
 	open = append(open, ad.Connection.ClientConn)
 
+	// The settings service is generated without a convenience constructor, so it
+	// gets its own connection here rather than sharing one of the others'.
+	stConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
+	if err != nil {
+		closeAll()
+		return nil, fmt.Errorf("cannot create zitadel settings connection: %w", err)
+	}
+
+	st := settingsapi.NewSettingsServiceClient(stConn.ClientConn)
+
 	return &Client{
-		user:        u,
-		project:     p,
-		application: a,
-		org:         o,
-		admin:       ad,
-		issuer:      issuer,
-		api:         api,
-		options:     opts,
-		management:  map[string]*management.Client{},
+		user:         u,
+		project:      p,
+		application:  a,
+		org:          o,
+		admin:        ad,
+		settings:     st,
+		settingsConn: stConn,
+		issuer:       issuer,
+		api:          api,
+		options:      opts,
+		management:   map[string]*management.Client{},
 	}, nil
 }
 
@@ -301,7 +319,7 @@ func connectionOptions(ctx context.Context, cfg Config, issuer, api string) []zi
 func (c *Client) Close() error {
 	var errs []error
 
-	for _, conn := range []interface{ Close() error }{c.user.Connection, c.project.Connection, c.application.Connection, c.org.Connection, c.admin.Connection} {
+	for _, conn := range []interface{ Close() error }{c.user.Connection, c.project.Connection, c.application.Connection, c.org.Connection, c.admin.Connection, c.settingsConn} {
 		if conn == nil {
 			continue
 		}

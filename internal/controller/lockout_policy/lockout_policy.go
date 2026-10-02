@@ -83,32 +83,29 @@ func (driver) Scope(ctx context.Context, kube client.Client, cr common.ManagedPo
 	return orgID, nil
 }
 
-// Get reads the organization's lockout policy.
+// Get reads the lockout policy.
 func (driver) Get(ctx context.Context, c *zitadel.Client, scope string) (zitadel.LockoutPolicy, bool, error) {
 	p, err := c.GetLockoutPolicy(ctx, scope)
 	if err != nil {
 		return zitadel.LockoutPolicy{}, false, err
 	}
 
-	return *p, p.IsDefault, nil
+	return *p, false, nil
 }
 
-// Apply writes the policy, adding or updating it as Zitadel requires.
-//
-// Zitadel separates adding a custom policy from updating one, and which to use
-// depends on whether the organization has one. The client works that out, so a
-// driver does not have to.
+// Apply writes the policy.
 func (driver) Apply(ctx context.Context, c *zitadel.Client, scope string, want zitadel.LockoutPolicyInput) error {
 	return c.SetLockoutPolicy(ctx, scope, want)
 }
 
-// Reset puts the organization back on the instance default lockout policy.
-// Resettable reports that deleting this resource can put the organization
-// back on the instance default, which is how Zitadel removes a custom policy.
+// Resettable reports whether deleting this resource can put the %s
+// back the way it was by resetting it.
 func (driver) Resettable() bool { return true }
 
-func (driver) Reset(ctx context.Context, c *zitadel.Client, scope string) error {
-	return c.ResetLockoutPolicy(ctx, scope)
+// Reset is only ever reached for a resettable policy, which an instance
+// wide one is not: Zitadel has no endpoint that clears it.
+func (driver) Reset(ctx context.Context, c *zitadel.Client, _ string) error {
+	return errors.New("the lockout policy cannot be reset; deleting the resource restores what it overwrote")
 }
 
 // Desired reads the desired policy out of the managed resource.

@@ -1,0 +1,339 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: defaultlabelpolicies.zitadel.m.crossplane.io
+spec:
+  group: zitadel.m.crossplane.io
+  names:
+    categories:
+    - crossplane
+    - managed
+    - zitadel
+    kind: DefaultLabelPolicy
+    listKind: DefaultLabelPolicyList
+    plural: defaultlabelpolicies
+    singular: defaultlabelpolicy
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.atProvider.isDefault
+      name: Default
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          A DefaultLabelPolicy is the instance's instance wide branding policy.
+
+          It is namespaced like every other managed resource here, because that
+          is what its ProviderConfig reference needs. What it manages is not:
+          there is one lockout policy for the whole instance whichever namespace
+          the resource lives in.
+
+          set the colours and theme an organization inherits for its login pages.
+
+          It is a singleton: there is one of each for the whole instance. Zitadel
+          offers no way to reset an instance wide policy - there is no default
+          beneath it - so deleting this resource writes back the value it
+          overwrote rather than removing anything.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: DefaultLabelPolicySpec defines the desired state of a DefaultLabelPolicy.
+            properties:
+              forProvider:
+                description: DefaultLabelPolicyParameters are the configurable fields
+                  of a DefaultLabelPolicy.
+                properties:
+                  backgroundColor:
+                    description: Page background colour, as a hex value.
+                    type: string
+                  backgroundColorDark:
+                    description: Page background colour of the dark theme, as a hex
+                      value.
+                    type: string
+                  disableWatermark:
+                    description: Hide the Zitadel watermark.
+                    type: boolean
+                  fontColor:
+                    description: Text colour, as a hex value.
+                    type: string
+                  fontColorDark:
+                    description: Text colour of the dark theme, as a hex value.
+                    type: string
+                  fontURL:
+                    description: |-
+                      Where Zitadel serves the custom font from. Reported only, as with
+                      `logoURL`.
+                    type: string
+                  hideLoginNameSuffix:
+                    description: |-
+                      Hide the organization suffix on the login form. Takes effect when the
+                      `urn:zitadel:iam:org:domain:primary:{domainname}` scope is requested.
+                    type: boolean
+                  iconDarkURL:
+                    description: |-
+                      Where Zitadel serves the dark theme favicon from. Reported only, as with
+                      `logoURL`.
+                    type: string
+                  iconURL:
+                    description: Where Zitadel serves the favicon from. Reported only,
+                      as with `logoURL`.
+                    type: string
+                  logoDarkURL:
+                    description: |-
+                      Where Zitadel serves the dark theme logo from. Reported only, as with
+                      `logoURL`.
+                    type: string
+                  logoURL:
+                    description: |-
+                      Where Zitadel serves the logo from. Reported only: assets are uploaded
+                      outside the API, so this provider neither sets nor removes them.
+                    type: string
+                  primaryColor:
+                    description: Primary colour, as a hex value such as `#5282C1`.
+                    type: string
+                  primaryColorDark:
+                    description: Primary colour of the dark theme, as a hex value.
+                    type: string
+                  themeMode:
+                    description: |-
+                      Which theme the login pages use. One of `Auto`, `Light` or `Dark`. Defaults
+                      to `Auto`.
+                    enum:
+                    - Auto
+                    - Light
+                    - Dark
+                    type: string
+                  warnColor:
+                    description: Colour used for warnings, as a hex value.
+                    type: string
+                  warnColorDark:
+                    description: Warning colour of the dark theme, as a hex value.
+                    type: string
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: |-
+                  THIS IS A BETA FIELD. It is on by default but can be opted out
+                  through a Crossplane feature flag.
+                  ManagementPolicies specify the array of actions Crossplane is allowed to
+                  take on the managed and external resources.
+                  See the design doc for more information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md
+                items:
+                  description: |-
+                    A ManagementAction represents an action that the Crossplane controllers
+                    can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
+              providerConfigRef:
+                default:
+                  kind: ClusterProviderConfig
+                  name: default
+                description: |-
+                  ProviderConfigReference specifies how the provider that will be used to
+                  create, observe, update, and delete this managed resource should be
+                  configured.
+                properties:
+                  kind:
+                    description: Kind of the referenced object.
+                    type: string
+                  name:
+                    description: Name of the referenced object.
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+              writeConnectionSecretToRef:
+                description: |-
+                  WriteConnectionSecretToReference specifies the namespace and name of a
+                  Secret to which any connection details for this managed resource should
+                  be written. Connection details frequently include the endpoint, username,
+                  and password required to connect to the managed resource.
+                properties:
+                  name:
+                    description: Name of the secret.
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - forProvider
+            type: object
+          status:
+            description: DefaultLabelPolicyStatus is the observed state of a DefaultLabelPolicy.
+            properties:
+              atProvider:
+                description: DefaultLabelPolicyObservation is what the instance wide
+                  branding policy of an organization currently is.
+                properties:
+                  backgroundColor:
+                    description: Page background colour, as a hex value.
+                    type: string
+                  backgroundColorDark:
+                    description: Page background colour of the dark theme, as a hex
+                      value.
+                    type: string
+                  disableWatermark:
+                    description: Hide the Zitadel watermark.
+                    type: boolean
+                  fontColor:
+                    description: Text colour, as a hex value.
+                    type: string
+                  fontColorDark:
+                    description: Text colour of the dark theme, as a hex value.
+                    type: string
+                  fontURL:
+                    description: |-
+                      Where Zitadel serves the custom font from. Reported only, as with
+                      `logoURL`.
+                    type: string
+                  hideLoginNameSuffix:
+                    description: |-
+                      Hide the organization suffix on the login form. Takes effect when the
+                      `urn:zitadel:iam:org:domain:primary:{domainname}` scope is requested.
+                    type: boolean
+                  iconDarkURL:
+                    description: |-
+                      Where Zitadel serves the dark theme favicon from. Reported only, as with
+                      `logoURL`.
+                    type: string
+                  iconURL:
+                    description: Where Zitadel serves the favicon from. Reported only,
+                      as with `logoURL`.
+                    type: string
+                  isDefault:
+                    description: IsDefault is true while the organization still uses
+                      the instance default.
+                    type: boolean
+                  logoDarkURL:
+                    description: |-
+                      Where Zitadel serves the dark theme logo from. Reported only, as with
+                      `logoURL`.
+                    type: string
+                  logoURL:
+                    description: |-
+                      Where Zitadel serves the logo from. Reported only: assets are uploaded
+                      outside the API, so this provider neither sets nor removes them.
+                    type: string
+                  primaryColor:
+                    description: Primary colour, as a hex value such as `#5282C1`.
+                    type: string
+                  primaryColorDark:
+                    description: Primary colour of the dark theme, as a hex value.
+                    type: string
+                  restore:
+                    description: |-
+                      The policy this resource overwrote, kept so that deleting it can put the
+                      previous value back. Only used for a policy Zitadel cannot reset.
+                    format: byte
+                    type: string
+                  themeMode:
+                    description: |-
+                      Which theme the login pages use. One of `Auto`, `Light` or `Dark`. Defaults
+                      to `Auto`.
+                    enum:
+                    - Auto
+                    - Light
+                    - Dark
+                    type: string
+                  warnColor:
+                    description: Colour used for warnings, as a hex value.
+                    type: string
+                  warnColorDark:
+                    description: Warning colour of the dark theme, as a hex value.
+                    type: string
+                type: object
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  description: A Condition that may apply to a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        LastTransitionTime is the last time this condition transitioned from one
+                        status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A Message containing details about this condition's last transition from
+                        one status to another, if any.
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      type: integer
+                    reason:
+                      description: A Reason for this condition's last transition from
+                        one status to another.
+                      type: string
+                    status:
+                      description: Status of this condition; is it currently True,
+                        False, or Unknown?
+                      type: string
+                    type:
+                      description: |-
+                        Type of this condition. At most one of each condition type may apply to
+                        a resource at any point in time.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the latest metadata.generation
+                  which resulted in either a ready state, or stalled due to error
+                  it can not recover from without human intervention.
+                format: int64
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

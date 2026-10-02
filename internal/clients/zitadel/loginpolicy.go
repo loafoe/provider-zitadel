@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"time"
 
 	managementv1 "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/management"
 	policyv1 "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/policy"
@@ -564,4 +565,21 @@ func durationString(d *durationpb.Duration) string {
 	}
 
 	return d.AsDuration().String()
+}
+
+// durationProto parses a Go duration string for the Zitadel API.
+//
+// An empty string means "leave it alone" and is passed on as an absent duration,
+// which is what keeps an unset lifetime from being written as an explicit zero.
+func durationProto(s string) *durationpb.Duration {
+	if s == "" {
+		return nil
+	}
+
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return nil
+	}
+
+	return durationpb.New(d)
 }
