@@ -198,10 +198,14 @@ jobs:
       # actions/attest-build-provenance derives it from the workflow run itself
       # using the same OIDC token as the signature. The attestation is pushed to
       # the registry as an OCI attestation of the subject digest.
+      # subject-name is the repository, never a tag: the action rejects a tagged
+      # reference with "Invalid image name", and the digest is what identifies
+      # the subject. Both artifacts live in the same repository and differ only
+      # by digest, so both are attested the same way.
       - name: Attest the build provenance
         uses: actions/attest-build-provenance@v2
         with:
-          subject-name: ${{ env.IMAGE }}:controller-${{ github.ref_name }}
+          subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.sign.outputs.controller_digest }}
           push-to-registry: true
 
@@ -226,22 +230,27 @@ jobs:
           CHANNEL: stable
           XPKG_REG_ORGS: ghcr.io/${{ github.repository_owner }}
 
+      # Every channel tag lives in the same repository, so the digest reference
+      # is always ${IMAGE}@<digest>. Sign by digest rather than by tag so the
+      # signature covers the exact bytes a consumer pulls, and verify each one
+      # immediately rather than only at the end of the job.
       - name: Sign the promoted channels
         env:
           CERT_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/release.yml@refs/tags/${{ github.ref_name }}
         run: |
           set -euo pipefail
-          for ref in \
-            "${IMAGE}:stable" \
-            "${IMAGE}:${GITHUB_REF_NAME}-stable" \
-            "${IMAGE}:controller-stable" \
-            "${IMAGE}:controller-${GITHUB_REF_NAME}-stable"; do
-            echo "::group::Sign ${ref}"
-            cosign sign --yes "${ref}@$(crane digest "${ref}")"
+          for tag in \
+            "stable" \
+            "${GITHUB_REF_NAME}-stable" \
+            "controller-stable" \
+            "controller-${GITHUB_REF_NAME}-stable"; do
+            digest="$(crane digest "${IMAGE}:${tag}")"
+            echo "::group::Sign ${IMAGE}:${tag}@${digest}"
+            cosign sign --yes "${IMAGE}@${digest}"
             cosign verify \
               --certificate-identity "${CERT_IDENTITY}" \
               --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-              "${ref}@$(crane digest "${ref}")"
+              "${IMAGE}@${digest}"
             echo "::endgroup::"
           done
 
