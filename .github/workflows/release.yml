@@ -192,11 +192,25 @@ jobs:
           echo "controller_digest=${controller_digest}" >> "$GITHUB_OUTPUT"
         id: sign
 
+      # Provenance is emitted with GitHub's native attestation rather than
+      # `cosign attest`: cosign v2 requires a --predicate file, which means
+      # carrying a SLSA generator through the build, while
+      # actions/attest-build-provenance derives it from the workflow run itself
+      # using the same OIDC token as the signature. The attestation is pushed to
+      # the registry as an OCI attestation of the subject digest.
       - name: Attest the build provenance
-        run: |
-          set -euo pipefail
-          cosign attest --yes --type slsaprovenance \
-            "${IMAGE}:controller-${GITHUB_REF_NAME}@${{ steps.sign.outputs.controller_digest }}"
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.IMAGE }}:controller-${{ github.ref_name }}
+          subject-digest: ${{ steps.sign.outputs.controller_digest }}
+          push-to-registry: true
+
+      - name: Attest the package build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.meta.outputs.digest }}
+          push-to-registry: true
 
       - name: Verify both artifacts are multi-arch image indexes
         run: |
