@@ -31,6 +31,7 @@ import (
 	"strings"
 	"sync"
 
+	adminapi "github.com/zitadel/zitadel-go/v3/pkg/client/admin"
 	apiv2 "github.com/zitadel/zitadel-go/v3/pkg/client/application/v2"
 	"github.com/zitadel/zitadel-go/v3/pkg/client/management"
 	"github.com/zitadel/zitadel-go/v3/pkg/client/middleware"
@@ -101,6 +102,10 @@ type Client struct {
 	project     *projectv2.Client
 	application *apiv2.Client
 	org         *orgv2.Client
+
+	// The v1 admin API is instance scoped and is the only API that manages
+	// instance memberships (IAM roles).
+	admin *adminapi.Client
 
 	// The v1 management API is organization scoped and needs a connection per
 	// organization, so its clients are created lazily and cached here. See
@@ -231,11 +236,19 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 	}
 	open = append(open, o.Connection.ClientConn)
 
+	ad, err := adminapi.NewClient(ctx, issuer, api, scopes, opts...)
+	if err != nil {
+		closeAll()
+		return nil, fmt.Errorf("cannot create zitadel admin client: %w", err)
+	}
+	open = append(open, ad.Connection.ClientConn)
+
 	return &Client{
 		user:        u,
 		project:     p,
 		application: a,
 		org:         o,
+		admin:       ad,
 		issuer:      issuer,
 		api:         api,
 		options:     opts,
@@ -283,7 +296,7 @@ func connectionOptions(ctx context.Context, cfg Config, issuer, api string) []zi
 func (c *Client) Close() error {
 	var errs []error
 
-	for _, conn := range []interface{ Close() error }{c.user.Connection, c.project.Connection, c.application.Connection, c.org.Connection} {
+	for _, conn := range []interface{ Close() error }{c.user.Connection, c.project.Connection, c.application.Connection, c.org.Connection, c.admin.Connection} {
 		if conn == nil {
 			continue
 		}
@@ -306,6 +319,59 @@ func (c *Client) Close() error {
 
 // IsNotFound reports whether err indicates that the external resource does not
 // exist.
+// IsNotChanged reports whether Zitadel refused a write because it would have
+// changed nothing.
+//
+// Zitadel guards several update endpoints with a precondition that fails when
+// the submitted state matches the stored state, which would otherwise put a
+// managed resource into a permanent error loop: the controller observes the
+// desired state, decides an update is needed, and Zitadel refuses it forever.
+func IsNotChanged(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	st, ok := grpcStatus(err)
+	if !ok {
+		return false
+	}
+
+	if st.Code() != codes.FailedPrecondition && st.Code() != codes.InvalidArgument {
+		return false
+	}
+
+	// Zitadel spells this differently per API version: the v2 management API
+	// says "No changes" and the v1 one a "NotChanged" error code.
+	msg := st.Message()
+
+	return strings.Contains(msg, "NotChanged") || strings.Contains(msg, "No changes")
+}
+
+// grpcStatus extracts the gRPC status of an error.
+//
+// The error may reach us straight from a gRPC call, in which case it is the
+// status itself, or wrapped with context by one of the methods here, in which
+// case the status is one level down. Both have to work, because a test that
+// recognises a specific Zitadel failure has to recognise it however the caller
+// wrapped it.
+func grpcStatus(err error) (*status.Status, bool) {
+	if err == nil {
+		return nil, false
+	}
+
+	if st, ok := status.FromError(err); ok {
+		return st, true
+	}
+
+	if inner := errors.Unwrap(err); inner != nil {
+		if st, ok := status.FromError(inner); ok {
+			return st, true
+		}
+	}
+
+	return nil, false
+}
+
 func IsNotFound(err error) bool {
 	if err == nil {
 		return false
@@ -315,7 +381,7 @@ func IsNotFound(err error) bool {
 		return true
 	}
 
-	st, ok := status.FromError(err)
+	st, ok := grpcStatus(err)
 	if !ok {
 		return false
 	}

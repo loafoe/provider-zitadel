@@ -79,6 +79,14 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	if _, err := e.userID(ctx, cr); err != nil {
+		if meta.WasDeleted(cr) {
+			// Nothing resolves while an object is terminating, so report the
+			// external resource as gone. That lets the reconciler run Delete,
+			// which lets the finalizer go, instead of retrying an observation
+			// that can never succeed.
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
+
 		return managed.ExternalObservation{}, err
 	}
 
@@ -165,6 +173,13 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	cr.Status.SetConditions(xpv1.Deleting())
 
+	if common.NeverCreated(cr.Status.AtProvider.UserID) {
+		// Nothing was ever created in Zitadel, so there is nothing to detach
+		// from. Returning success lets the finalizer go instead of leaving the
+		// object stuck.
+		return managed.ExternalDelete{}, nil
+	}
+
 	id := meta.GetExternalName(cr)
 	if id == "" {
 		return managed.ExternalDelete{}, nil
@@ -197,12 +212,10 @@ func (e *external) Disconnect(ctx context.Context) error {
 func (e *external) userID(ctx context.Context, cr *v1alpha1.PersonalAccessToken) (string, error) {
 	fp := cr.Spec.ForProvider
 
-	current := ""
-	if cr.Status.AtProvider.UserID != nil {
-		current = *cr.Status.AtProvider.UserID
-	}
-
-	id, err := common.ResolveUserID(ctx, e.kube, cr, fp.UserRef, fp.UserSelector, fp.UserID, current)
+	// Zitadel only issues a personal access token for a machine user, so the
+	// reference is resolved against a ServiceAccount. Resolving a HumanUser here
+	// would fail in Zitadel with "Not allowed for this user type".
+	id, _, err := common.ResolveServiceAccount(ctx, e.kube, cr, fp.UserRef, fp.UserSelector, fp.UserID)
 	if err != nil {
 		return "", common.Join(common.ErrResolveUser, err)
 	}

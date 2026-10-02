@@ -71,6 +71,14 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	orgID, err := e.organizationID(ctx, cr)
 	if err != nil {
+		if meta.WasDeleted(cr) {
+			// Nothing resolves while an object is terminating, so report the
+			// external resource as gone. That lets the reconciler run Delete,
+			// which lets the finalizer go, instead of retrying an observation
+			// that can never succeed.
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
+
 		return managed.ExternalObservation{}, err
 	}
 
@@ -319,6 +327,13 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	cr.Status.SetConditions(xpv1.Deleting())
 
+	if common.NeverCreated(cr.Status.AtProvider.OrganizationID) {
+		// Nothing was ever created in Zitadel, so there is nothing to detach
+		// from. Returning success lets the finalizer go instead of leaving the
+		// object stuck.
+		return managed.ExternalDelete{}, nil
+	}
+
 	id := meta.GetExternalName(cr)
 	if id == "" {
 		return managed.ExternalDelete{}, nil
@@ -340,17 +355,13 @@ func (e *external) Disconnect(ctx context.Context) error {
 func (e *external) organizationID(ctx context.Context, cr *v1alpha1.HumanUser) (string, error) {
 	fp := cr.Spec.ForProvider
 
-	current := ""
-	if cr.Status.AtProvider.OrganizationID != nil {
-		current = *cr.Status.AtProvider.OrganizationID
-	}
-
 	providerDefault, err := common.ProviderConfigOrganizationID(ctx, e.kube, cr)
 	if err != nil {
 		return "", common.Join(common.ErrResolveOrganization, err)
 	}
 
-	id, err := common.ResolveOrganizationID(ctx, e.kube, cr, fp.OrganizationRef, fp.OrganizationSelector, fp.OrganizationID, providerDefault, current)
+	id, err := common.ResolveOrganizationID(ctx, e.kube, cr, fp.OrganizationRef, fp.OrganizationSelector, fp.OrganizationID, providerDefault,
+		common.CurrentIfDeleting(meta.WasDeleted(cr), cr.Status.AtProvider.OrganizationID))
 	if err != nil {
 		return "", common.Join(common.ErrResolveOrganization, err)
 	}

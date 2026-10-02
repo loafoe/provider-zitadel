@@ -18,7 +18,7 @@ readable Go controller per managed resource, and it uses the modern Zitadel
 | Zitadel versions | 4.x (the `*/v2` gRPC APIs) |
 | Crossplane | v2 (namespaced managed resources) |
 
-## Managed resources (phase 1)
+## Managed resources
 
 Everything is a **namespaced** managed resource, so a whole Zitadel tenancy can
 be described in one namespace and permissions can be scoped down to a single
@@ -30,14 +30,48 @@ team.
 | `Project` | A project inside an organization. Parent of roles and OIDC applications. |
 | `ProjectRole` | A role of a project, grantable to users and service accounts. |
 | `OIDCApplication` | An OAuth2 / OIDC client (redirect URIs, grant types, response types, token settings). |
+| `ApplicationAPI` | A Zitadel API application, authenticated with a client secret or a private key JWT. |
 | `HumanUser` | An interactive user with a profile, email, phone and an initial password. |
 | `ServiceAccount` | A machine user. Can be used to authenticate the provider itself. |
-| `PersonalAccessToken` | A Personal Access Token for a `HumanUser` or a `ServiceAccount`. |
+| `MachineKey` | A machine key generated for a `ServiceAccount`, with its `key.json` written to a connection secret. |
+| `PersonalAccessToken` | A Personal Access Token for a `ServiceAccount`. |
+| `OrgMember` | A user's membership of an organization, with organization roles. |
+| `InstanceMember` | A user's membership of the instance itself, with IAM roles. |
+| `UserGrant` | Project roles granted to a user of the project's own organization. |
+| `ProjectGrant` | A project shared with another organization, along with the roles that organization may use. |
+| `ProjectGrantMember` | A user of the granted organization, with roles on the shared project. |
+| `UserMetadata` | The complete metadata set of a user. |
+| `OrganizationMetadata` | The complete metadata set of an organization. |
+| `LoginPolicy` | The login policy of an organization: registration, MFA, password lifetimes. |
 
-Phase 1 deliberately covers "enough to create users, service accounts, projects
-and OAuth2 clients", plus the two containers (`Organization`, `ProjectRole`) and
-the credentials helper (`PersonalAccessToken`) you need to make that useful.
-See [Roadmap](#roadmap) for what is next.
+All managed resources are namespaced, in `zitadel.m.crossplane.io/v1alpha1`.
+`ProviderConfig` stays cluster wide in `zitadel.crossplane.io/v1alpha1`, so one
+ProviderConfig can serve every namespace that needs it. See [Roadmap](#roadmap)
+for what is next.
+
+### Grouping the resources
+
+The kinds fall into four groups, and it helps to know which one you are looking
+at when a manifest fails:
+
+* **Structure** — `Organization`, `Project`, `ProjectRole`, `OIDCApplication`,
+  `ApplicationAPI`.
+* **Principals** — `HumanUser`, `ServiceAccount`, `MachineKey`,
+  `PersonalAccessToken`.
+* **Authorization** — `OrgMember`, `InstanceMember`, `UserGrant`,
+  `ProjectGrant`, `ProjectGrantMember`. These attach roles to subjects; none of
+  them creates a subject.
+* **Settings** — `UserMetadata`, `OrganizationMetadata`, `LoginPolicy`.
+
+### Two kinds of role keys
+
+Zitadel uses different role keys at each level, and mixing them up is the most
+common reason a grant is rejected. A `ProjectGrant` takes the **project's** role
+keys (`invoice-reader`, defined by a `ProjectRole`), while a `ProjectGrantMember`
+takes the **grant's** roles, which Zitadel prefixes with `PROJECT_GRANT_`. A
+member of a granted project is deliberately not given a role in the project
+itself; the grant is what confers the role, and the member picks which of the
+grant's roles to hold.
 
 ## Authenticating the provider
 
@@ -169,10 +203,59 @@ The `billing-web-oidc` secret is written with:
 | `clientSecret` | The client secret. Zitadel only returns it once, at creation (or when `regenerateClientSecret` is set). |
 
 A `HumanUser` additionally publishes `userID` and `username`, a `ServiceAccount`
-publishes `userID` and `username`, and a `PersonalAccessToken` publishes
-`token`, `tokenID` and `userID`.
+publishes `userID` and `username`, a `PersonalAccessToken` publishes `token`,
+`tokenID` and `userID`, a `MachineKey` publishes `keyID` and `key.json`, and an
+`ApplicationAPI` publishes `clientID` plus `clientSecret` or `privateKey`.
 
-More examples live in [`examples/`](./examples).
+More examples live in [`examples/`](./examples), one file per kind.
+
+## Sharing a project with another organization
+
+The SaaS case, and the one place the two kinds of role key matter, is worth
+walking through. A platform organization owns a billing project and offers it to
+a customer organization. Three steps, and the order is not negotiable:
+
+```yaml
+# 1. The project and a role on it, in the owning organization.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: ProjectRole
+metadata: {name: invoice-reader, namespace: identity}
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    projectRef: {name: billing}
+    displayName: Invoice Reader
+    key: invoice-reader
+---
+# 2. Share the project with the customer organization. Note the role keys: these
+#    are the project's own roles, not PROJECT_GRANT_* ones.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: ProjectGrant
+metadata: {name: billing-to-customer, namespace: identity}
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    organizationRef: {name: platform}          # the project's owner
+    projectRef: {name: billing}
+    grantedOrganizationRef: {name: customer}   # who it is shared with
+    roleKeys: [invoice-reader]
+---
+# 3. Let a user of the customer organization use it. Note the role keys again:
+#    these are the grant's roles.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: ProjectGrantMember
+metadata: {name: bob-invoice-reader, namespace: identity}
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    projectRef: {name: billing}
+    grantedOrganizationRef: {name: customer}
+    userRef: {name: bob}
+    roleKeys: [PROJECT_GRANT_OWNER]
+```
+
+`ProjectGrantMember` needs no `organizationRef`: `grantedOrganizationRef` is both
+who the project is shared with and whose members are being added.
 
 ## Cross-resource references
 
@@ -189,8 +272,8 @@ Resolution honours Crossplane's reference policies (`ResolveIfNotPresent` by
 default) and an already resolved value is kept, so a selector that later
 matches more than one resource cannot silently re-point an existing resource.
 
-`PersonalAccessToken.userRef` resolves against **both** `ServiceAccount` and
-`HumanUser`, in that order, because tokens are usually issued for machine users.
+`PersonalAccessToken.userRef` resolves against a `ServiceAccount`, because
+Zitadel issues personal access tokens for machine users only.
 
 ## Drift detection
 
@@ -219,6 +302,53 @@ A few Zitadel specifics the provider works around:
   resource is found again by a pinned `id`, then by name within its
   organization or project. A user supplied (non numeric) external name is never
   resolved, because Crossplane cannot tell whether it is an ID.
+* **A machine key is looked up per owning user.** Zitadel's v2 `ListKeys`
+  answers for the authenticated user only, so a service account's key is
+  invisible to it: the lookup would always come back empty and the controller
+  would create a new key on every reconcile. The provider reads keys through the
+  v1 `ListMachineKeys`, which takes the owning user. The SDK marks that endpoint
+  deprecated, and the `//nolint:staticcheck` above the call says why.
+* **A project grant's roles can only be narrowed.** Zitadel rejects an update
+  naming a role the grant does not already have, and reports it as
+  `Errors.Project.Role.NotFound`. Adding a role therefore means recreating the
+  grant; removing one is an ordinary update. The provider reports this as
+  itself rather than leaving a misleading "unknown project role".
+* **Personal access tokens are for machine users.** Zitadel refuses to issue
+  one for an interactive user (`Errors.User.WrongType`), so `PersonalAccessToken`
+  resolves its reference against a `ServiceAccount`.
+* **Metadata is additive.** Zitadel's metadata writes never remove a key, so
+  conveying "this is the whole set" takes both a write and an explicit delete of
+  the keys that are no longer wanted. That is why `UserMetadata` and
+  `OrganizationMetadata` manage the complete set of one subject rather than one
+  key each: two resources each writing part of a set would both see the other's
+  keys as drift and fight over them.
+* **Login policy factor lists are diffed.** `UpdateCustomLoginPolicy` does not
+  accept second or multi factor lists, so the provider adds and removes them
+  through the dedicated endpoints.
+* **A login policy is a singleton per organization.** Deleting the resource
+  resets the organization to the instance default. An organization with no
+  custom policy still answers the read, reporting the inherited default, and
+  rejects the update; that is read as "nothing customised yet" and the policy is
+  created rather than updated.
+
+### Deletion
+
+Deleting a managed resource never depends on resolving its references, because
+Zitadel and Crossplane between them make that unreliable:
+
+* While an object is terminating, the Crossplane reference resolver deliberately
+  stops resolving and returns the caller's current value. Resolution therefore
+  starts from the spec, so a dependent notices when a referenced resource is
+  replaced and follows the new one — and a terminating object instead acts on
+  the identity recorded in its own status.
+* `Observe` reports the external resource as gone while an object is terminating
+  if it cannot resolve anything, so the reconciler reaches `Delete` instead of
+  retrying an observation that can never succeed.
+* `Delete` uses the identifiers already observed, and returns success when there
+  are none: a resource whose Create never got far enough has nothing in Zitadel
+  to detach from. Without this a single failed Create leaves an object stuck in
+  `Terminating` forever, because the delete that would clean it up depends on the
+  very resolution that keeps failing.
 
 ## Installing
 
@@ -391,17 +521,54 @@ asserts that Zitadel accepts a token obtained from a machine key.
 
 ## Roadmap
 
-Phase 1 covers the resources above. Natural next steps, roughly in the order
-they tend to be needed:
+Phase 2 added the authorization, credential and settings kinds listed above.
+Natural next steps, roughly in the order they tend to be needed:
 
-* `ProjectGrant` and `UserGrant` — sharing a project with another organization
-  and granting project roles to users and service accounts.
-* `MachineKey` — declaratively add a machine key to a `ServiceAccount` and
-  write the `key.json` to a connection secret, so the provider's own service
-  account can be bootstrapped without leaving the cluster.
 * `OrgIDP` / `IDP` — upstream identity providers.
-* `ApplicationAPI` — Zitadel API applications.
 * `Action` / `ActionTarget` — login customisation.
+* `NotificationProvider` and `PasswordComplexity` — the rest of the organization
+  settings.
+
+### Coverage against the Terraform provider
+
+The official Zitadel Terraform provider registers **89** managed resources. This
+provider currently models **17** of them:
+
+| | |
+|---|---|
+| Raw parity | 17 / 89 = **19%** |
+| Excluding localisation resources | 17 / 87 = **20%** |
+
+The two excluded resources (`default_hosted_login_translation`,
+`hosted_login_translation`) carry translated UI text rather than infrastructure,
+so a Crossplane managed resource is not a natural fit for them. Beyond that the
+gap is genuine work still to do, and it clusters into four groups:
+
+* **Identity providers** — 23 resources (`idp_google`, `org_idp_ldap`, …). The
+  largest single block, and repetitive: each provider is the same wiring with a
+  different endpoint.
+* **Policies and settings** — 17 resources (`label_policy`, `lockout_policy`,
+  `password_complexity_policy`, `notification_policy`, …). `LoginPolicy` is the
+  first of this family; the rest follow the same singleton-per-scope shape.
+* **Instance level** — 8 resources (`instance_features`, `system_features`,
+  `instance_restrictions`, `instance_custom_domain`, `instance_trusted_domain`,
+  `instance_secret_generator`, `smtp_config`, `trigger_actions`). Note that
+  `instance_features` and `system_features` only toggle flags, so they have no
+  identity of their own to reconcile.
+* **Login customisation** — 7 `action` / `action_target` resources.
+* **The rest** — 15 resources: `application_saml`, `application_key`, the two
+  remaining `*_v2` aliases, `organization`, `domain`, `domain_policy`,
+  `organization_domain`, `org_metadata`, `project_member`, `webkey`,
+  `active_webkey`, and the four `email_provider_*` / `sms_provider_*` kinds.
+
+Counts are reproducible from the Terraform provider's own resource registry:
+
+```console
+git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/zitadel/terraform-provider-zitadel.git
+cd tf-zitadel && git sparse-checkout set zitadel
+grep -oE '"zitadel_[a-z0-9_]+":\s*\w+\.GetResource\(\)' zitadel/provider.go | sort -u | wc -l
+```
 
 ## Contributing
 

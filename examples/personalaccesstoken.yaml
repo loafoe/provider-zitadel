@@ -1,0 +1,24 @@
+# A Personal Access Token is a long lived credential for calling the Zitadel
+# API directly, without going through an OIDC flow.
+#
+# Zitadel only issues personal access tokens for machine users, so the reference
+# has to be a ServiceAccount. Pointing it at a HumanUser fails with "Not allowed
+# for this user type". For an OIDC client credential use ServiceAccount plus
+# MachineKey instead, which is the stronger option.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: PersonalAccessToken
+metadata:
+  name: worker-token
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  # The token itself is only returned once, so it is published to a secret.
+  writeConnectionSecretToRef:
+    name: worker-token
+  forProvider:
+    userRef:
+      name: worker
+    # Zitadel always requires an expiration date. When it is omitted the provider
+    # uses one year from the time the token is created.
+    expirationDate: "2027-01-01T00:00:00Z"

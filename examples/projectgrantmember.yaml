@@ -1,0 +1,20 @@
+# Give a user of the granted organization specific roles on the shared project.
+#
+# These are the *grant's* roles, which Zitadel prefixes with PROJECT_GRANT_, not
+# the project's role keys: a member of a granted project is deliberately not
+# given a role in the project itself, which is what the grant is for.
+#
+# There is no organizationRef here: grantedOrganizationRef is both who the
+# project is shared with and whose members are being added.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: ProjectGrantMember
+metadata:
+  name: customer-a-user-invoice-reader
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    projectRef: {name: billing}
+    grantedOrganizationRef: {name: customer-a}
+    userRef: {name: customer-a-user}
+    roleKeys: [PROJECT_GRANT_OWNER]

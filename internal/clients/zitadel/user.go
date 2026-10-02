@@ -92,12 +92,6 @@ type IDPLink struct {
 	UserName string
 }
 
-// MetadataEntry is a single metadata key/value pair.
-type MetadataEntry struct {
-	Key   string
-	Value string
-}
-
 // CreateHumanUserResult is returned after creating a human user.
 type CreateHumanUserResult struct {
 	// UserID is the ID of the created user.
@@ -137,7 +131,12 @@ type CreateServiceAccountInput struct {
 
 // User describes a Zitadel user (human or machine).
 type User struct {
-	UserID             string
+	UserID string
+
+	// OrganizationID is the organization that owns the user. Zitadel scopes some
+	// APIs, machine keys among them, by organization rather than by user, so
+	// callers need it even though a user identifies itself unambiguously.
+	OrganizationID     string
 	UserName           string
 	PreferredLoginName string
 	LoginNames         []string
@@ -197,6 +196,7 @@ func (c *Client) GetUser(ctx context.Context, userID string) (*User, error) { //
 	u := resp.GetUser()
 	out := &User{
 		UserID:             u.GetUserId(),
+		OrganizationID:     u.GetDetails().GetResourceOwner(),
 		UserName:           u.GetUsername(),
 		PreferredLoginName: u.GetPreferredLoginName(),
 		LoginNames:         u.GetLoginNames(),

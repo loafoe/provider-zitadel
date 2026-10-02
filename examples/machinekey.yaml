@@ -1,0 +1,19 @@
+# A machine key for a service account. The provider generates the RSA key pair,
+# registers the public half with Zitadel, and writes the key.json document to
+# the connection secret - which is exactly what a ProviderConfig with
+# `authType: ServiceAccount` expects.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: MachineKey
+metadata:
+  name: billing-worker-key
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  writeConnectionSecretToRef:
+    name: billing-worker-key
+  forProvider:
+    serviceAccountRef:
+      name: billing-worker
+    expirationDate: "2027-01-01T00:00:00Z"

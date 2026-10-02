@@ -1,0 +1,17 @@
+# A Zitadel API application: a client that authenticates service to service
+# calls. With generatePrivateKey the provider also writes an RSA key to the
+# connection secret, which is what a PrivateKeyJwt client signs with.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: ApplicationAPI
+metadata:
+  name: platform-api
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  writeConnectionSecretToRef:
+    name: platform-api-oidc
+  forProvider:
+    name: Platform API
+    projectRef: {name: billing}
+    authMethodType: PrivateKeyJwt
+    generatePrivateKey: true

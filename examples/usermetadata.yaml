@@ -1,0 +1,17 @@
+# Attributes Actions read to make decisions, most commonly the identifier a user
+# has in an upstream system. The whole set is managed at once because Zitadel
+# replaces metadata rather than merging it.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: UserMetadata
+metadata:
+  name: alice-metadata
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    userRef: {name: alice}
+    metadata:
+      - key: external_id
+        value: "hr-1234"
+      - key: department
+        value: finance

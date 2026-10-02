@@ -69,6 +69,10 @@ func metadata(fp v1alpha1.HumanUserParameters) []zitadel.MetadataEntry {
 // updateStatus copies the observed state of u into the status of cr.
 func updateStatus(cr *v1alpha1.HumanUser, u *zitadel.User) {
 	cr.Status.AtProvider.ID = common.StringPtr(u.UserID)
+
+	if u.OrganizationID != "" {
+		cr.Status.AtProvider.OrganizationID = common.StringPtr(u.OrganizationID)
+	}
 	cr.Status.AtProvider.UserName = common.StringPtr(u.UserName)
 	cr.Status.AtProvider.PreferredLoginName = common.StringPtr(u.PreferredLoginName)
 	cr.Status.AtProvider.LoginNames = u.LoginNames

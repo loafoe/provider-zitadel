@@ -374,9 +374,12 @@ func (c *Client) GenerateClientSecret(ctx context.Context, applicationID string)
 }
 
 // DeleteOIDCApplication removes an application.
-func (c *Client) DeleteOIDCApplication(ctx context.Context, applicationID string) error {
+func (c *Client) DeleteOIDCApplication(ctx context.Context, applicationID, projectID string) error {
+	// Zitadel validates both fields, so the project is not optional even though
+	// the application identifies itself.
 	if _, err := c.application.DeleteApplication(ctx, &apiv2.DeleteApplicationRequest{
 		ApplicationId: applicationID,
+		ProjectId:     projectID,
 	}); err != nil {
 		if IsNotFound(err) {
 			return nil

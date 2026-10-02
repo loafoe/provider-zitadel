@@ -53,6 +53,15 @@ const (
 	TokenTypeJwt = "Jwt"
 )
 
+// Client authentication methods, as Zitadel spells them in its API.
+const (
+	// AuthMethodBasic authenticates with the client secret.
+	AuthMethodBasic = "Basic"
+
+	// AuthMethodPrivateKeyJwt authenticates with a signed JWT.
+	AuthMethodPrivateKeyJwt = "PrivateKeyJwt"
+)
+
 // ParseDuration converts a duration string such as "5s" into a protobuf
 // duration.
 func ParseDuration(d string) (*durationpb.Duration, error) {
@@ -342,13 +351,13 @@ func OIDCApplicationTypeFromProto(t apiv2.OIDCApplicationType) string {
 // representation.
 func OIDCAuthMethodTypeToProto(t string) (apiv2.OIDCAuthMethodType, error) {
 	switch t {
-	case "", "Basic":
+	case "", AuthMethodBasic:
 		return apiv2.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_BASIC, nil
 	case "Post":
 		return apiv2.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_POST, nil
 	case "None":
 		return apiv2.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_NONE, nil
-	case "PrivateKeyJwt":
+	case AuthMethodPrivateKeyJwt:
 		return apiv2.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_PRIVATE_KEY_JWT, nil
 	default:
 		return apiv2.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_BASIC, fmt.Errorf("unsupported OIDC auth method type %q", t)
@@ -364,12 +373,12 @@ func OIDCAuthMethodTypeFromProto(t apiv2.OIDCAuthMethodType) string {
 	case apiv2.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_NONE:
 		return "None"
 	case apiv2.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_PRIVATE_KEY_JWT:
-		return "PrivateKeyJwt"
+		return AuthMethodPrivateKeyJwt
 	case apiv2.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_BASIC:
-		return "Basic"
+		return AuthMethodBasic
 	}
 
-	return "Basic"
+	return AuthMethodBasic
 }
 
 // OIDCResponseTypeToProto maps an API OIDC response type onto the protobuf

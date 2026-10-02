@@ -216,13 +216,13 @@ func ApplicationTypeToV1(t string) (appv1.OIDCAppType, error) {
 // representation.
 func AuthMethodTypeToV1(t string) (appv1.OIDCAuthMethodType, error) {
 	switch t {
-	case "", "Basic":
+	case "", AuthMethodBasic:
 		return appv1.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_BASIC, nil
 	case "Post":
 		return appv1.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_POST, nil
 	case "None":
 		return appv1.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_NONE, nil
-	case "PrivateKeyJwt":
+	case AuthMethodPrivateKeyJwt:
 		return appv1.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_PRIVATE_KEY_JWT, nil
 	default:
 		return appv1.OIDCAuthMethodType_OIDC_AUTH_METHOD_TYPE_BASIC, fmt.Errorf("unsupported OIDC auth method type %q", t)

@@ -1,0 +1,17 @@
+# An organization's login policy. Zitadel keeps exactly one per organization, so
+# this resource is a singleton and deleting it reverts the organization to the
+# instance default.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: LoginPolicy
+metadata:
+  name: platform-login-policy
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    organizationRef: {name: platform}
+    allowRegister: false
+    ignoreUnknownUsernames: true
+    passwordCheckLifetime: 8760h
+    secondFactors: [OTP, OTPEmail]
+    multiFactors: [U2FWithVerification]

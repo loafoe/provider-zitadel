@@ -1,0 +1,16 @@
+# Instance level roles, for the administrators of the Zitadel instance itself.
+# This is how the first administrator of a new instance is created.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: InstanceMember
+metadata:
+  name: alice-instance-owner
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    userRef:
+      name: alice
+    roleKeys:
+      - IAM_OWNER

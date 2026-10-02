@@ -340,3 +340,22 @@ func fromProtoProjectRole(r *projectv2.ProjectRole) *ProjectRole {
 
 	return out
 }
+
+// ListProjectRoles returns the roles a project defines. A user grant on a
+// project of its own organization may only use these.
+func (c *Client) ListProjectRoles(ctx context.Context, projectID string) ([]string, error) {
+	resp, err := c.project.ListProjectRoles(ctx, &projectv2.ListProjectRolesRequest{
+		ProjectId:  projectID,
+		Pagination: &filterv2.PaginationRequest{Limit: 1000},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot list the roles of project %s: %w", projectID, err)
+	}
+
+	out := make([]string, 0, len(resp.GetProjectRoles()))
+	for _, r := range resp.GetProjectRoles() {
+		out = append(out, r.GetKey())
+	}
+
+	return out, nil
+}

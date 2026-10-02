@@ -1,0 +1,18 @@
+# Organization level roles. This is what lets a human administer an
+# organization; project roles are a separate resource.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: OrgMember
+metadata:
+  name: alice-org-owner
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    organizationRef:
+      name: platform
+    userRef:
+      name: alice
+    roleKeys:
+      - ORG_OWNER

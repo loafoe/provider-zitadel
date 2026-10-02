@@ -128,6 +128,79 @@ const (
 	ConnectionKeyEmailCode = "emailCode"
 	// ConnectionKeyPhoneCode is a phone verification code returned by Zitadel.
 	ConnectionKeyPhoneCode = "phoneCode"
+)
+
+// MembershipState is the lifecycle state of a membership or grant.
+// +kubebuilder:validation:Enum=Active;Inactive
+type MembershipState string
+
+const (
+	MembershipStateActive   MembershipState = "Active"
+	MembershipStateInactive MembershipState = "Inactive"
+)
+
+// SecondFactor types Zitadel accepts as a second authentication factor.
+// +kubebuilder:validation:Enum=OTP;U2F;OTPEmail;OTPSMS;RecoveryCodes
+type SecondFactor string
+
+const (
+	SecondFactorOTP           SecondFactor = "OTP"
+	SecondFactorU2F           SecondFactor = "U2F"
+	SecondFactorOTPEmail      SecondFactor = "OTPEmail"
+	SecondFactorOTPSMS        SecondFactor = "OTPSMS"
+	SecondFactorRecoveryCodes SecondFactor = "RecoveryCodes"
+)
+
+// MultiFactor types Zitadel accepts as a multi authentication factor.
+// +kubebuilder:validation:Enum=U2FWithVerification
+type MultiFactor string
+
+const (
+	MultiFactorU2FWithVerification MultiFactor = "U2FWithVerification"
+)
+
+// PasswordlessType selects whether passwordless login is allowed.
+// +kubebuilder:validation:Enum=Allowed;NotAllowed
+type PasswordlessType string
+
+const (
+	PasswordlessTypeAllowed    PasswordlessType = "Allowed"
+	PasswordlessTypeNotAllowed PasswordlessType = "NotAllowed"
+)
+
+// APIAuthMethodType is how a client authenticates against an API application.
+// +kubebuilder:validation:Enum=Basic;PrivateKeyJwt
+type APIAuthMethodType string
+
+const (
+	APIAuthMethodTypeBasic         APIAuthMethodType = "Basic"
+	APIAuthMethodTypePrivateKeyJwt APIAuthMethodType = "PrivateKeyJwt"
+)
+
+// GrantableState is the lifecycle state of a project grant.
+// +kubebuilder:validation:Enum=Active;Inactive
+type GrantableState string
+
+const (
+	GrantableStateActive   GrantableState = "Active"
+	GrantableStateInactive GrantableState = "Inactive"
+)
+
+// Additional connection secret keys published by the phase 2 resources.
+const (
+	// ConnectionKeyUserGrantID is the ID of a user grant.
+	ConnectionKeyUserGrantID = "userGrantID"
+	// ConnectionKeyProjectGrantID is Zitadel's ID of a project grant.
+	ConnectionKeyProjectGrantID = "projectGrantID"
 	// ConnectionKeyKeyID is the ID of a machine key.
 	ConnectionKeyKeyID = "keyID"
+	// ConnectionKeyKeyJSON is the key.json document of a machine key: what a
+	// Zitadel client reads as a service account key.
+	ConnectionKeyKeyJSON = "key.json"
+	// ConnectionKeyPrivateKey is the PEM encoded RSA private key of an API
+	// application, written when one is requested at creation.
+	ConnectionKeyPrivateKey = "privateKey"
+	// ConnectionKeyMetadata is the JSON encoded metadata set of a user or
+	// organization, which is easier to consume than a set of individual keys.
+	ConnectionKeyMetadata = "metadata.json"
 )

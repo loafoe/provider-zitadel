@@ -1,0 +1,29 @@
+# Share a project with another organization. A platform organization can offer
+# a project to a customer organization without transferring ownership.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: Organization
+metadata:
+  name: customer-a
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    name: Customer A
+---
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: ProjectGrant
+metadata:
+  name: billing-to-customer-a
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    organizationRef: {name: platform}
+    projectRef: {name: billing}
+    grantedOrganizationRef: {name: customer-a}
+    roleKeys: [invoice-reader]
+    # Zitadel only accepts roles the grant already has, so a role cannot be added
+    # to a grant after it exists: the update fails with "Errors.Project.Role.NotFound".
+    # Removing a role works, and adding one means recreating the grant. These are
+    # the project's role keys, not the PROJECT_GRANT_* keys a ProjectGrantMember
+    # uses.

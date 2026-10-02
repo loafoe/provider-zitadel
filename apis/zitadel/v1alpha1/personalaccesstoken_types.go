@@ -28,18 +28,20 @@ import (
 // PersonalAccessTokenParameters are the configurable fields of a
 // PersonalAccessToken.
 type PersonalAccessTokenParameters struct {
-	// UserID is the ID of the user the token belongs to. Either `userID`,
+	// UserID is the ID of the machine user the token belongs to. Either `userID`,
 	// `userRef` or `userSelector` must be set.
 	// +optional
 	UserID *string `json:"userID,omitempty"`
 
-	// UserRef references a HumanUser or ServiceAccount managed by this provider
-	// and uses its ID.
+	// UserRef references a ServiceAccount managed by this provider and uses its
+	// ID. Zitadel issues personal access tokens for machine users only, so a
+	// HumanUser is rejected.
 	// +optional
 	UserRef *xpv1.Reference `json:"userRef,omitempty"`
 
-	// UserSelector selects a HumanUser or ServiceAccount managed by this
-	// provider and uses its ID.
+	// UserSelector selects a ServiceAccount managed by this provider and uses
+	// its ID. Zitadel issues personal access tokens for machine users only, so a
+	// HumanUser is rejected.
 	// +optional
 	UserSelector *xpv1.Selector `json:"userSelector,omitempty"`
 

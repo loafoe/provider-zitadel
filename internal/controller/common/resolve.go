@@ -19,11 +19,13 @@ package common
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reference"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -107,6 +109,7 @@ func ResolveOrganizationID(ctx context.Context, kube client.Client, mg resource.
 			Extract:   ExtractOrganizationID(),
 			Namespace: mg.GetNamespace(),
 		})
+
 		if err != nil {
 			return "", errors.Join(ErrResolveOrganization, err)
 		}
@@ -283,4 +286,131 @@ func EqualStringSlices(a, b []string) bool {
 	}
 
 	return true
+}
+
+// IsReferenceGone reports whether err means a referenced resource no longer
+// exists. Deletion has to tolerate this: by the time a dependent resource is
+// removed its organization, project or user may already be gone, and then
+// there is nothing left to detach from.
+func IsReferenceGone(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if kerrors.IsNotFound(err) {
+		return true
+	}
+
+	// The crossplane reference package wraps a NotFound from the API server
+	// rather than returning it directly.
+	return strings.Contains(err.Error(), "cannot get referenced resource") ||
+		strings.Contains(err.Error(), "referenced field was empty")
+}
+
+// ResolveServiceAccountID resolves a reference that must point at a
+// ServiceAccount specifically, as opposed to ResolveUserID which also accepts a
+// HumanUser. A machine key, for instance, can only belong to a machine user.
+func ResolveServiceAccountID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv1.Reference, selector *xpv1.Selector, direct *string, currentValue string) (string, error) {
+	if ref == nil && selector == nil {
+		if direct == nil {
+			return "", errors.Join(ErrNoUserID, errors.New("either serviceAccountID, serviceAccountRef or serviceAccountSelector must be set"))
+		}
+
+		return *direct, nil
+	}
+
+	rsp, err := reference.NewAPIResolver(kube, mg).Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: currentValue,
+		Reference:    ref,
+		Selector:     selector,
+		To: reference.To{
+			Managed: &v1alpha1.ServiceAccount{},
+			List:    &v1alpha1.ServiceAccountList{},
+		},
+		Extract:   ExtractUserID(),
+		Namespace: mg.GetNamespace(),
+	})
+	if err != nil {
+		return "", errors.Join(ErrNoUserID, err)
+	}
+
+	return rsp.ResolvedValue, nil
+}
+
+// Resolution and deletion
+//
+// Two rules keep a reference from turning into a stuck object:
+//
+//   - Resolution never starts from the observed status. Re-resolving from the
+//     spec is what lets a dependent notice that its referenced resource was
+//     deleted and recreated, which gives it a new identity. Handing the resolver
+//     the previously observed ID would short-circuit it, leaving the dependent
+//     pointing at a resource that no longer exists.
+//   - Deletion never resolves at all. While an object is terminating the
+//     crossplane reference resolver refuses to re-resolve, and a resource whose
+//     Create never succeeded has nothing to resolve from. Deletion therefore uses
+//     the identifiers already recorded in the status, and lets the finalizer go
+//     when there are none.
+
+// ResolveServiceAccount resolves a reference to a ServiceAccount and returns the
+// service account's ID together with the organization that owns it.
+//
+// Zitadel lists a user's machine keys through an organization scoped API, so a
+// caller that has to read a service account's keys needs both identifiers, and
+// resolving twice would be wasteful.
+func ResolveServiceAccount(ctx context.Context, kube client.Client, mg resource.ModernManaged,
+	ref *xpv1.Reference, selector *xpv1.Selector, direct *string,
+) (serviceAccountID, orgID string, err error) {
+	if ref == nil && selector == nil {
+		if direct == nil {
+			return "", "", errors.Join(ErrNoUserID, errors.New("either serviceAccountID, serviceAccountRef or serviceAccountSelector must be set"))
+		}
+
+		return *direct, "", nil
+	}
+
+	// The resolver hands back a single value, so the organization is captured
+	// as a side effect of extracting the ID.
+	rsp, err := reference.NewAPIResolver(kube, mg).Resolve(ctx, reference.ResolutionRequest{
+		Reference: ref,
+		Selector:  selector,
+		To: reference.To{
+			Managed: &v1alpha1.ServiceAccount{},
+			List:    &v1alpha1.ServiceAccountList{},
+		},
+		Extract: func(mg resource.Managed) string {
+			sa, ok := mg.(*v1alpha1.ServiceAccount)
+			if !ok {
+				return ""
+			}
+
+			orgID = Deref(sa.Status.AtProvider.OrganizationID)
+
+			return Deref(sa.Status.AtProvider.ID)
+		},
+		Namespace: mg.GetNamespace(),
+	})
+	if err != nil {
+		return "", "", errors.Join(ErrResolveUser, err)
+	}
+
+	return rsp.ResolvedValue, orgID, nil
+}
+
+// CurrentIfDeleting returns the observed identifier when the object is
+// terminating, and nothing otherwise.
+//
+// Resolution normally starts from the spec, so that a dependent notices when
+// its referenced resource was replaced and has to follow the new one. A
+// terminating object is the exception: it exists to remove what was created, so
+// it has to act on the identity it recorded. Following a reference that has
+// moved on would either delete the wrong thing, or - when the new subject
+// happens to hold state that looks like this resource's - delete forever without
+// ever letting the finalizer go.
+func CurrentIfDeleting(deleting bool, observed *string) string {
+	if !deleting {
+		return ""
+	}
+
+	return Deref(observed)
 }

@@ -1,0 +1,494 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: loginpolicies.zitadel.m.crossplane.io
+spec:
+  group: zitadel.m.crossplane.io
+  names:
+    categories:
+    - crossplane
+    - managed
+    - zitadel
+    kind: LoginPolicy
+    listKind: LoginPolicyList
+    plural: loginpolicies
+    singular: loginpolicy
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Synced')].status
+      name: SYNCED
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .status.atProvider.organizationID
+      name: ORGANIZATION
+      type: string
+    - jsonPath: .status.atProvider.isDefault
+      name: DEFAULT
+      type: boolean
+    - jsonPath: .status.atProvider.allowRegister
+      name: REGISTER
+      type: boolean
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          // A LoginPolicy is an organization's login and authentication policy: whether
+          self registration is allowed, whether MFA is forced, how long a password
+          change is accepted for. Zitadel keeps exactly one per organization, so this
+          resource is a singleton and deleting it reverts the organization to the
+          instance default rather than removing a policy.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: A LoginPolicySpec defines the desired state of a LoginPolicy.
+            properties:
+              forProvider:
+                description: LoginPolicyParameters are the configurable fields of
+                  a LoginPolicy.
+                properties:
+                  allowDomainDiscovery:
+                    description: |-
+                      AllowDomainDiscovery lets a login name without a domain be matched
+                      against verified domains.
+                    type: boolean
+                  allowExternalIDP:
+                    description: AllowExternalIDP allows login through an upstream
+                      identity provider.
+                    type: boolean
+                  allowRegister:
+                    description: AllowRegister allows users to register themselves.
+                    type: boolean
+                  allowUsernamePassword:
+                    description: AllowUsernamePassword allows login with a username
+                      and password.
+                    type: boolean
+                  defaultRedirectURI:
+                    description: DefaultRedirectURI is where a login lands when no
+                      redirect is requested.
+                    type: string
+                  disableLoginWithEmail:
+                    description: DisableLoginWithEmail disables login with an email
+                      address.
+                    type: boolean
+                  disableLoginWithPhone:
+                    description: DisableLoginWithPhone disables login with a phone
+                      number.
+                    type: boolean
+                  externalLoginCheckLifetime:
+                    description: |-
+                      ExternalLoginCheckLifetime is how long an upstream IdP link stays valid,
+                      e.g. "8760h".
+                    type: string
+                  forceMFA:
+                    description: ForceMFA requires multi factor authentication for
+                      every user.
+                    type: boolean
+                  forceMFALocalOnly:
+                    description: ForceMFALocalOnly requires MFA also for federated
+                      logins.
+                    type: boolean
+                  hidePasswordReset:
+                    description: HidePasswordReset hides the password reset option
+                      from the login UI.
+                    type: boolean
+                  idps:
+                    description: IDPs are the IDs of the identity providers offered
+                      on the login page.
+                    items:
+                      type: string
+                    type: array
+                  ignoreUnknownUsernames:
+                    description: |-
+                      IgnoreUnknownUsernames avoids leaking whether an account exists by
+                      answering the same way for an unknown and a wrong username.
+                    type: boolean
+                  mfaInitSkipLifetime:
+                    description: MFAInitSkipLifetime is how long MFA setup may be
+                      skipped, e.g. "720h".
+                    type: string
+                  multiFactorCheckLifetime:
+                    description: |-
+                      MultiFactorCheckLifetime is how long a multi factor stays valid, e.g.
+                      "8760h".
+                    type: string
+                  multiFactors:
+                    description: MultiFactors are the multi factors users may use.
+                    items:
+                      description: MultiFactor types Zitadel accepts as a multi authentication
+                        factor.
+                      enum:
+                      - U2FWithVerification
+                      type: string
+                    type: array
+                  organizationID:
+                    description: |-
+                      OrganizationID is the ID of the organization. Either `organizationID`,
+                      `organizationRef` or `organizationSelector` must be set.
+                    type: string
+                  organizationRef:
+                    description: OrganizationRef references an Organization managed
+                      by this provider.
+                    properties:
+                      name:
+                        description: Name of the referenced object.
+                        type: string
+                      policy:
+                        description: Policies for referencing.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    required:
+                    - name
+                    type: object
+                  organizationSelector:
+                    description: OrganizationSelector selects an Organization managed
+                      by this provider.
+                    properties:
+                      matchControllerRef:
+                        description: |-
+                          MatchControllerRef ensures an object with the same controller reference
+                          as the selecting object is selected.
+                        type: boolean
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: MatchLabels ensures an object with matching labels
+                          is selected.
+                        type: object
+                      policy:
+                        description: Policies for selection.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    type: object
+                  passwordCheckLifetime:
+                    description: |-
+                      PasswordCheckLifetime is how long a password change is accepted for,
+                      e.g. "8760h".
+                    type: string
+                  passwordlessType:
+                    description: PasswordlessType selects whether passwordless login
+                      is allowed.
+                    enum:
+                    - Allowed
+                    - NotAllowed
+                    type: string
+                  secondFactorCheckLifetime:
+                    description: |-
+                      SecondFactorCheckLifetime is how long a second factor stays valid, e.g.
+                      "8760h".
+                    type: string
+                  secondFactors:
+                    description: SecondFactors are the second factors users may use.
+                    items:
+                      description: SecondFactor types Zitadel accepts as a second
+                        authentication factor.
+                      enum:
+                      - OTP
+                      - U2F
+                      - OTPEmail
+                      - OTPSMS
+                      - RecoveryCodes
+                      type: string
+                    type: array
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: |-
+                  THIS IS A BETA FIELD. It is on by default but can be opted out
+                  through a Crossplane feature flag.
+                  ManagementPolicies specify the array of actions Crossplane is allowed to
+                  take on the managed and external resources.
+                  See the design doc for more information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md
+                items:
+                  description: |-
+                    A ManagementAction represents an action that the Crossplane controllers
+                    can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
+              providerConfigRef:
+                default:
+                  kind: ClusterProviderConfig
+                  name: default
+                description: |-
+                  ProviderConfigReference specifies how the provider that will be used to
+                  create, observe, update, and delete this managed resource should be
+                  configured.
+                properties:
+                  kind:
+                    description: Kind of the referenced object.
+                    type: string
+                  name:
+                    description: Name of the referenced object.
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+              writeConnectionSecretToRef:
+                description: |-
+                  WriteConnectionSecretToReference specifies the namespace and name of a
+                  Secret to which any connection details for this managed resource should
+                  be written. Connection details frequently include the endpoint, username,
+                  and password required to connect to the managed resource.
+                properties:
+                  name:
+                    description: Name of the secret.
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - forProvider
+            type: object
+          status:
+            description: A LoginPolicyStatus represents the observed state of a LoginPolicy.
+            properties:
+              atProvider:
+                description: LoginPolicyObservation are the observable fields of a
+                  LoginPolicy.
+                properties:
+                  allowDomainDiscovery:
+                    description: |-
+                      AllowDomainDiscovery lets a login name without a domain be matched
+                      against verified domains.
+                    type: boolean
+                  allowExternalIDP:
+                    description: AllowExternalIDP allows login through an upstream
+                      identity provider.
+                    type: boolean
+                  allowRegister:
+                    description: AllowRegister allows users to register themselves.
+                    type: boolean
+                  allowUsernamePassword:
+                    description: AllowUsernamePassword allows login with a username
+                      and password.
+                    type: boolean
+                  defaultRedirectURI:
+                    description: DefaultRedirectURI is where a login lands when no
+                      redirect is requested.
+                    type: string
+                  disableLoginWithEmail:
+                    description: DisableLoginWithEmail disables login with an email
+                      address.
+                    type: boolean
+                  disableLoginWithPhone:
+                    description: DisableLoginWithPhone disables login with a phone
+                      number.
+                    type: boolean
+                  externalLoginCheckLifetime:
+                    description: ExternalLoginCheckLifetime is how long an upstream
+                      IdP link stays valid.
+                    type: string
+                  forceMFA:
+                    description: ForceMFA requires multi factor authentication for
+                      every user.
+                    type: boolean
+                  forceMFALocalOnly:
+                    description: ForceMFALocalOnly requires MFA also for federated
+                      logins.
+                    type: boolean
+                  hidePasswordReset:
+                    description: HidePasswordReset hides the password reset option
+                      from the login UI.
+                    type: boolean
+                  idps:
+                    description: IDPs are the identity providers offered on the login
+                      page.
+                    items:
+                      type: string
+                    type: array
+                  ignoreUnknownUsernames:
+                    description: IgnoreUnknownUsernames avoids leaking whether an
+                      account exists.
+                    type: boolean
+                  isDefault:
+                    description: |-
+                      IsDefault is true while the organization still uses the instance default
+                      policy.
+                    type: boolean
+                  mfaInitSkipLifetime:
+                    description: MFAInitSkipLifetime is how long MFA setup may be
+                      skipped.
+                    type: string
+                  multiFactorCheckLifetime:
+                    description: MultiFactorCheckLifetime is how long a multi factor
+                      stays valid.
+                    type: string
+                  multiFactors:
+                    description: MultiFactors are the multi factors users may use.
+                    items:
+                      description: MultiFactor types Zitadel accepts as a multi authentication
+                        factor.
+                      enum:
+                      - U2FWithVerification
+                      type: string
+                    type: array
+                  organizationID:
+                    description: OrganizationID is the organization the policy belongs
+                      to.
+                    type: string
+                  passwordCheckLifetime:
+                    description: PasswordCheckLifetime is how long a password change
+                      is accepted for.
+                    type: string
+                  passwordlessType:
+                    description: PasswordlessType selects whether passwordless login
+                      is allowed.
+                    enum:
+                    - Allowed
+                    - NotAllowed
+                    type: string
+                  secondFactorCheckLifetime:
+                    description: SecondFactorCheckLifetime is how long a second factor
+                      stays valid.
+                    type: string
+                  secondFactors:
+                    description: SecondFactors are the second factors users may use.
+                    items:
+                      description: SecondFactor types Zitadel accepts as a second
+                        authentication factor.
+                      enum:
+                      - OTP
+                      - U2F
+                      - OTPEmail
+                      - OTPSMS
+                      - RecoveryCodes
+                      type: string
+                    type: array
+                type: object
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  description: A Condition that may apply to a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        LastTransitionTime is the last time this condition transitioned from one
+                        status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A Message containing details about this condition's last transition from
+                        one status to another, if any.
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      type: integer
+                    reason:
+                      description: A Reason for this condition's last transition from
+                        one status to another.
+                      type: string
+                    status:
+                      description: Status of this condition; is it currently True,
+                        False, or Unknown?
+                      type: string
+                    type:
+                      description: |-
+                        Type of this condition. At most one of each condition type may apply to
+                        a resource at any point in time.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the latest metadata.generation
+                  which resulted in either a ready state, or stalled due to error
+                  it can not recover from without human intervention.
+                format: int64
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

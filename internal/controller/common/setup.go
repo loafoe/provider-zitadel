@@ -152,3 +152,40 @@ func SetupManagedResourceController(mgr ctrl.Manager, o controller.Options, grou
 		For(obj).
 		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
 }
+
+// NeverCreated reports whether a managed resource's external identity was never
+// established, which means Create never got far enough to record it.
+//
+// Deletion must not depend on resolving the resource's references. Two things
+// make that necessary:
+//
+//   - While an object is terminating, the crossplane reference resolver
+//     deliberately refuses to re-resolve and returns the caller's current value
+//     instead. A resource whose status has nothing to offer therefore resolves to
+//     nothing while it is being deleted.
+//   - A resource whose very first Create failed has no identity at all.
+//
+// In both cases there is nothing in Zitadel to detach from, so Delete returns
+// success and lets the finalizer go, rather than blocking the object forever.
+func NeverCreated(ids ...*string) bool {
+	for _, id := range ids {
+		if id == nil || *id == "" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// NeverCreated covers the two ways a managed resource can be deleted without an
+// external identity:
+//
+//   - its Create never succeeded, so there is nothing in Zitadel to detach from;
+//   - it is terminating, and the crossplane reference resolver refuses to
+//     re-resolve references while an object is being deleted, so resolving from
+//     the spec alone would fail.
+//
+// In both cases Delete returns success and lets the finalizer go. Without this a
+// single failed Create leaves the object stuck in Terminating forever, because
+// the delete that has to clean it up depends on the very resolution that keeps
+// failing.

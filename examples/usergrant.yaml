@@ -1,0 +1,20 @@
+# Project roles for a user. Without a UserGrant a user can exist in an
+# organization but can do nothing in any of its projects.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: UserGrant
+metadata:
+  name: alice-billing-reader
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    organizationRef:
+      name: platform
+    projectRef:
+      name: billing
+    userRef:
+      name: alice
+    roleKeys:
+      - reader

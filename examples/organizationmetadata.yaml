@@ -1,0 +1,12 @@
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: OrganizationMetadata
+metadata:
+  name: platform-metadata
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    organizationRef: {name: platform}
+    metadata:
+      - key: cost_center
+        value: "4711"

@@ -72,6 +72,14 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	projectID, err := e.projectID(ctx, cr)
 	if err != nil {
+		if meta.WasDeleted(cr) {
+			// Nothing resolves while an object is terminating, so report the
+			// external resource as gone. That lets the reconciler run Delete,
+			// which lets the finalizer go, instead of retrying an observation
+			// that can never succeed.
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
+
 		return managed.ExternalObservation{}, err
 	}
 
@@ -245,12 +253,19 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	cr.Status.SetConditions(xpv1.Deleting())
 
+	if common.NeverCreated(cr.Status.AtProvider.ProjectID) {
+		// Nothing was ever created in Zitadel, so there is nothing to detach
+		// from. Returning success lets the finalizer go instead of leaving the
+		// object stuck.
+		return managed.ExternalDelete{}, nil
+	}
+
 	id := meta.GetExternalName(cr)
 	if id == "" {
 		return managed.ExternalDelete{}, nil
 	}
 
-	if err := e.client.DeleteOIDCApplication(ctx, id); err != nil {
+	if err := e.client.DeleteOIDCApplication(ctx, id, common.Deref(cr.Status.AtProvider.ProjectID)); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, "cannot delete application from Zitadel")
 	}
 
@@ -266,12 +281,8 @@ func (e *external) Disconnect(ctx context.Context) error {
 func (e *external) projectID(ctx context.Context, cr *v1alpha1.OIDCApplication) (string, error) {
 	fp := cr.Spec.ForProvider
 
-	current := ""
-	if cr.Status.AtProvider.ProjectID != nil {
-		current = *cr.Status.AtProvider.ProjectID
-	}
-
-	id, err := common.ResolveProjectID(ctx, e.kube, cr, fp.ProjectRef, fp.ProjectSelector, fp.ProjectID, current)
+	id, err := common.ResolveProjectID(ctx, e.kube, cr, fp.ProjectRef, fp.ProjectSelector, fp.ProjectID,
+		common.CurrentIfDeleting(meta.WasDeleted(cr), cr.Status.AtProvider.ProjectID))
 	if err != nil {
 		return "", common.Join(common.ErrResolveProject, err)
 	}

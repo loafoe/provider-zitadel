@@ -8,8 +8,44 @@ package v1alpha1
 
 import resource "github.com/crossplane/crossplane-runtime/v2/pkg/resource"
 
+// GetItems of this ApplicationAPIList.
+func (l *ApplicationAPIList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
 // GetItems of this HumanUserList.
 func (l *HumanUserList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this InstanceMemberList.
+func (l *InstanceMemberList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this LoginPolicyList.
+func (l *LoginPolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this MachineKeyList.
+func (l *MachineKeyList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]
@@ -26,6 +62,15 @@ func (l *OIDCApplicationList) GetItems() []resource.Managed {
 	return items
 }
 
+// GetItems of this OrgMemberList.
+func (l *OrgMemberList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
 // GetItems of this OrganizationList.
 func (l *OrganizationList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
@@ -35,8 +80,35 @@ func (l *OrganizationList) GetItems() []resource.Managed {
 	return items
 }
 
+// GetItems of this OrganizationMetadataList.
+func (l *OrganizationMetadataList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
 // GetItems of this PersonalAccessTokenList.
 func (l *PersonalAccessTokenList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this ProjectGrantList.
+func (l *ProjectGrantList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this ProjectGrantMemberList.
+func (l *ProjectGrantMemberList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]
@@ -64,6 +136,24 @@ func (l *ProjectRoleList) GetItems() []resource.Managed {
 
 // GetItems of this ServiceAccountList.
 func (l *ServiceAccountList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this UserGrantList.
+func (l *UserGrantList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this UserMetadataList.
+func (l *UserMetadataList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]
