@@ -148,7 +148,7 @@ jobs:
         id: meta
         run: |
           set -euo pipefail
-          digest="$(crane digest "${IMAGE}@${GITHUB_REF_NAME}")"
+          digest="$(crane digest "${IMAGE}:${GITHUB_REF_NAME}")"
           echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
           {
