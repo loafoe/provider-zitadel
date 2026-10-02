@@ -87,7 +87,7 @@ jobs:
 
       - name: Find the Go Build Cache
         id: go
-        run: echo "cachedir=$(make go.cachedir)" >> $GITHUB_ENV
+        run: echo "cachedir=$(make go.cachedir)" >> "$GITHUB_OUTPUT"
 
       - name: Cache the Go Build Cache
         uses: actions/cache@v4
