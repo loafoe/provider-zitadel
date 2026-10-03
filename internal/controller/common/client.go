@@ -77,6 +77,10 @@ var (
 	// ErrNoUserID is returned when the user a resource belongs to cannot be
 	// determined.
 	ErrNoUserID = errors.New("cannot determine the user of the resource")
+
+	// ErrNoApplicationID is returned when the application a resource belongs to
+	// cannot be determined.
+	ErrNoApplicationID = errors.New("cannot determine the application of the resource")
 )
 
 // NewClientFromProviderConfig reads the ProviderConfig referenced by mg from

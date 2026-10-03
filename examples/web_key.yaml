@@ -1,0 +1,26 @@
+# An example of a Zitadel signing key.
+#
+# Apply it with:
+#
+#     kubectl apply -f web_key.yaml
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: WebKey
+metadata:
+  name: zitadel-web-key
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    # rsa, ecdsa or ed25519. Zitadel generates the key; the private half never
+    # leaves it, so there is no material to supply.
+    algorithm: rsa
+    # Zitadel's default is 2048. Ignored for the other algorithms.
+    rsaBits: RSA_BITS_2048
+    # Zitadel's default is SHA256. Ignored for the other algorithms.
+    rsaHasher: RSA_HASHER_SHA256
+    #
+    # Zitadel creates a key inactive, so it verifies nothing until something
+    # activates it. An ActivatedWebKey is what does that.

@@ -1,0 +1,29 @@
+# An example of a Zitadel project member.
+#
+# Apply it with:
+#
+#     kubectl apply -f project_member.yaml
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: ProjectMember
+metadata:
+  name: platform-owner
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    organizationRef:
+      name: platform
+    projectRef:
+      name: platform
+    userRef:
+      name: platform-owner
+    # The role keys are not fixed: a project may define roles of its own, so
+    # they are read from the project rather than assumed.
+    roles:
+      - PROJECT_OWNER
+    #
+    # Zitadel refuses a member with no role at all, so at least one is required.
+    # To take every role away, delete this resource rather than emptying the list.

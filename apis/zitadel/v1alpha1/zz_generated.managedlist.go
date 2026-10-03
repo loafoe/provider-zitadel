@@ -80,6 +80,15 @@ func (l *ApplicationAPIList) GetItems() []resource.Managed {
 	return items
 }
 
+// GetItems of this ApplicationKeyList.
+func (l *ApplicationKeyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
 // GetItems of this DefaultDomainPolicyList.
 func (l *DefaultDomainPolicyList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
@@ -602,6 +611,15 @@ func (l *ProjectList) GetItems() []resource.Managed {
 	return items
 }
 
+// GetItems of this ProjectMemberList.
+func (l *ProjectMemberList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
 // GetItems of this ProjectRoleList.
 func (l *ProjectRoleList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
@@ -649,6 +667,15 @@ func (l *UserGrantList) GetItems() []resource.Managed {
 
 // GetItems of this UserMetadataList.
 func (l *UserMetadataList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this WebKeyList.
+func (l *WebKeyList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]

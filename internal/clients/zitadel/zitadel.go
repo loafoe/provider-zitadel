@@ -42,8 +42,10 @@ import (
 	actionapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/action/v2"
 	featureapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/feature/v2"
 	instanceapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/instance/v2"
+	permissionapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/internal_permission/v2"
 	orgv2api "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/org/v2"
 	settingsapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/settings/v2"
+	webkeyapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/webkey/v2"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -131,6 +133,16 @@ type Client struct {
 	// the only surface that can add, list and remove one.
 	orgDomain     orgv2api.OrganizationServiceClient
 	orgDomainConn *zitadel.Connection
+
+	// The v2 webkey service holds Zitadel's own signing keys, which are what an
+	// application verifies a token with.
+	webkey     webkeyapi.WebKeyServiceClient
+	webkeyConn *zitadel.Connection
+
+	// The v2 internal permission service grants roles against a resource, which
+	// is how a project membership is written.
+	permission     permissionapi.InternalPermissionServiceClient
+	permissionConn *zitadel.Connection
 
 	// The v1 admin API is the only API that manages instance memberships (IAM
 	// roles), instance settings and the domain policy. Most of it is instance
@@ -321,26 +333,42 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 		return nil, fmt.Errorf("cannot create zitadel organization domain connection: %w", err)
 	}
 
+	wkConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
+	if err != nil {
+		closeAll()
+		return nil, fmt.Errorf("cannot create zitadel webkey connection: %w", err)
+	}
+
+	permConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
+	if err != nil {
+		closeAll()
+		return nil, fmt.Errorf("cannot create zitadel permission connection: %w", err)
+	}
+
 	return &Client{
-		user:          u,
-		project:       p,
-		application:   a,
-		org:           o,
-		admin:         ad,
-		action:        act,
-		actionConn:    actConn,
-		feature:       ft,
-		featureConn:   ftConn,
-		settings:      st,
-		settingsConn:  stConn,
-		instance:      instanceapi.NewInstanceServiceClient(instConn.ClientConn),
-		instanceConn:  instConn,
-		orgDomain:     orgv2api.NewOrganizationServiceClient(orgDomConn.ClientConn),
-		orgDomainConn: orgDomConn,
-		issuer:        issuer,
-		api:           api,
-		options:       opts,
-		management:    map[string]*management.Client{},
+		user:           u,
+		project:        p,
+		application:    a,
+		org:            o,
+		admin:          ad,
+		action:         act,
+		actionConn:     actConn,
+		feature:        ft,
+		featureConn:    ftConn,
+		settings:       st,
+		settingsConn:   stConn,
+		instance:       instanceapi.NewInstanceServiceClient(instConn.ClientConn),
+		instanceConn:   instConn,
+		orgDomain:      orgv2api.NewOrganizationServiceClient(orgDomConn.ClientConn),
+		orgDomainConn:  orgDomConn,
+		webkey:         webkeyapi.NewWebKeyServiceClient(wkConn.ClientConn),
+		webkeyConn:     wkConn,
+		permission:     permissionapi.NewInternalPermissionServiceClient(permConn.ClientConn),
+		permissionConn: permConn,
+		issuer:         issuer,
+		api:            api,
+		options:        opts,
+		management:     map[string]*management.Client{},
 	}, nil
 }
 
@@ -384,7 +412,7 @@ func connectionOptions(ctx context.Context, cfg Config, issuer, api string) []zi
 func (c *Client) Close() error {
 	var errs []error
 
-	for _, conn := range []interface{ Close() error }{c.user.Connection, c.project.Connection, c.application.Connection, c.org.Connection, c.admin.Connection, c.settingsConn, c.actionConn, c.featureConn, c.instanceConn, c.orgDomainConn} {
+	for _, conn := range []interface{ Close() error }{c.user.Connection, c.project.Connection, c.application.Connection, c.org.Connection, c.admin.Connection, c.settingsConn, c.actionConn, c.featureConn, c.instanceConn, c.orgDomainConn, c.webkeyConn, c.permissionConn} {
 		if conn == nil {
 			continue
 		}

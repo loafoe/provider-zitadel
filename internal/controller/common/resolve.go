@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"reflect"
 	"strings"
 	"time"
 
@@ -482,6 +483,99 @@ func EnumValues[T ~string](values []string) []T {
 	}
 
 	return out
+}
+
+// ResolveApplicationID resolves a reference that must point at an OIDCApplication
+// or an ApplicationAPI.
+//
+// Both are applications in Zitadel, split by kind here because their settings
+// differ, so a reference is tried against each in turn rather than pinned to one.
+// A reference that names neither is rejected by Zitadel, and a selector that
+// matches both kinds is reported rather than picked from.
+func ResolveApplicationID(ctx context.Context, kube client.Client, mg resource.ModernManaged,
+	ref *xpv1.Reference, selector *xpv1.Selector, direct *string,
+) (string, error) {
+	if ref == nil && selector == nil {
+		if direct == nil {
+			return "", errors.Join(ErrNoApplicationID, errors.New("either applicationID, applicationRef or applicationSelector must be set"))
+		}
+
+		return *direct, nil
+	}
+
+	extracted := map[reflect.Type]string{}
+
+	for _, to := range []reference.To{
+		{
+			Managed: &v1alpha1.OIDCApplication{},
+			List:    &v1alpha1.OIDCApplicationList{},
+		},
+		{
+			Managed: &v1alpha1.ApplicationAPI{},
+			List:    &v1alpha1.ApplicationAPIList{},
+		},
+	} {
+		if err := extractApplicationID(ctx, kube, mg, ref, selector, to, extracted); err != nil {
+			return "", err
+		}
+	}
+
+	switch len(extracted) {
+	case 0:
+		return "", errors.Join(ErrNoApplicationID, ErrResolveUser)
+
+	case 1:
+		for _, id := range extracted {
+			return id, nil
+		}
+	}
+
+	return "", errors.Join(ErrNoApplicationID,
+		errors.New("the selector matched both an OIDCApplication and an ApplicationAPI; narrow it so it matches one"))
+}
+
+// extractApplicationID records the identifier of one application kind, so that
+// both can be tried before deciding there is one or none.
+func extractApplicationID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv1.Reference,
+	selector *xpv1.Selector, to reference.To, out map[reflect.Type]string,
+) error {
+	extract := func(m resource.Managed) string {
+		id, ok := m.(interface{ GetApplicationID() string })
+		if !ok {
+			return ""
+		}
+
+		return id.GetApplicationID()
+	}
+
+	rsp, err := reference.NewAPIResolver(kube, mg).Resolve(ctx, reference.ResolutionRequest{
+		Reference: ref,
+		Selector:  selector,
+		To:        to,
+		Extract:   extract,
+		Namespace: mg.GetNamespace(),
+	})
+	if err != nil {
+		// A kind that does not match is not a failure: the other kind may.
+		// A kind that matched nothing is not a failure: the other kind may match.
+		if kerrors.IsNotFound(err) {
+			return nil
+		}
+
+		return errors.Join(ErrResolveUser, err)
+	}
+
+	if rsp.ResolvedReference == nil {
+		return nil
+	}
+
+	// The resolver hands back the identifier it extracted, which is all that is
+	// needed to tell which kind matched.
+	if rsp.ResolvedValue != "" {
+		out[reflect.TypeOf(to.Managed)] = rsp.ResolvedValue
+	}
+
+	return nil
 }
 
 // ResolveTargetID resolves a reference that must point at an ActionTarget.

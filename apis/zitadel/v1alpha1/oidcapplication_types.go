@@ -341,3 +341,9 @@ var (
 func init() {
 	SchemeBuilder.Register(&OIDCApplication{}, &OIDCApplicationList{})
 }
+
+// GetApplicationID returns the Zitadel identifier of the application.
+//
+// A key belongs to an application of either kind, so a reference to one is
+// resolved through this rather than reaching into each kind's status.
+func (mg *OIDCApplication) GetApplicationID() string { return Deref(mg.Status.AtProvider.ID) }

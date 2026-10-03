@@ -1,0 +1,31 @@
+# An example of a Zitadel application key.
+#
+# Apply it with:
+#
+#     kubectl apply -f application_key.yaml
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: ApplicationKey
+metadata:
+  name: platform-app-key
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  writeConnectionSecretToRef:
+    name: platform-app-key
+  forProvider:
+    organizationRef:
+      name: platform
+    projectRef:
+      name: platform
+    applicationRef:
+      name: platform-oidc
+    # When the key stops working, as a duration from now. Empty means it does
+    # not expire.
+    expirationDate: 8760h
+    #
+    # The private half is written to the connection secret as key.json, because
+    # Zitadel returns it exactly once: here. There is no way to read it again,
+    # so a key whose secret was lost can only be replaced.

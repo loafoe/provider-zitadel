@@ -54,6 +54,7 @@ team.
 | `LockoutPolicy` … `DefaultSecuritySettings` | The seven organization policies, and the ten instance-wide policies they inherit from. |
 | `InstanceFeatures`, `SystemFeatures`, `InstanceRestrictions`, `InstanceSecretGenerator` | The four instance wide settings that are a single value: the feature flags, the registration restrictions, and the shape of one of Zitadel's generated codes. |
 | `InstanceCustomDomain`, `InstanceTrustedDomain`, `OrganizationDomain` | The three lists of domains: the ones the instance answers on, the ones allowed to ask it for a token, and the ones an organization owns. |
+| `WebKey`, `ApplicationKey`, `ProjectMember` | Zitadel's own signing keys, the key an application authenticates itself with, and a user's roles on a project. |
 | `IDPOIDC`, `IDPOAuth`, `IDPApple`, `IDPAzureAD`, `IDPGitHub`, `IDPGitHubEnterpriseServer`, `IDPGitLab`, `IDPGitLabSelfHosted`, `IDPGoogle`, `IDPLDAP`, `IDPSAML` | Identity providers available to every organization that has not set up its own. |
 | `OrgIDPOIDC`, `OrgIDPOAuth`, `OrgIDPJWT`, `OrgIDPApple`, `OrgIDPAzureAD`, `OrgIDPGitHub`, `OrgIDPGitHubEnterpriseServer`, `OrgIDPGitLab`, `OrgIDPGitLabSelfHosted`, `OrgIDPGoogle`, `OrgIDPLDAP`, `OrgIDPSAML` | The same providers, belonging to one organization. |
 
@@ -88,6 +89,9 @@ at when a manifest fails:
   `InstanceTrustedDomain` and `OrganizationDomain`. A domain is a name in a list
   and nothing else, so they share a harness with no equality function at all: the
   name is the identity, and once it is in the list there is nothing to compare.
+* **Keys and grants** — `WebKey` (a signing key Zitadel generates),
+  `ApplicationKey` (the key an application authenticates itself with, whose
+  private half is written to the connection secret), and `ProjectMember`.
 * **Identity providers** — twelve provider types, each in two forms: one
   available to the whole instance (`IDPGitHub`) and one belonging to an
   organization (`OrgIDPGitHub`). Twenty three kinds in all, and the last block
@@ -614,12 +618,12 @@ Natural next steps, roughly in the order they tend to be needed:
 ### Coverage against the Terraform provider
 
 The official Zitadel Terraform provider registers **89** managed resources. This
-provider currently models **71** of them, one for one:
+provider currently models **74** of them, one for one:
 
 | | |
 |---|---|
-| Raw parity | 71 / 89 = **80%** |
-| Adjusted parity | 71 / 80 = **89%** |
+| Raw parity | 74 / 89 = **83%** |
+| Adjusted parity | 74 / 80 = **92%** |
 
 The adjusted figure drops five of the 89: two localisation resources
 (`default_hosted_login_translation`, `hosted_login_translation`), which carry
@@ -627,16 +631,14 @@ translated UI text rather than infrastructure, and three deprecated aliases
 (`zitadel_org`, `zitadel_project_v2`, `zitadel_application_v2`) kept only for
 backwards compatibility and shadowed by kinds this provider models directly.
 
-What is left is 9 of the 80 worth modelling:
+What is left is 6 of the 80 worth modelling:
 
 * **Messaging** — `email_provider_http`, `email_provider_smtp`,
   `sms_provider_http` and `sms_provider_twilio`, which are the providers Zitadel
   sends its codes and notifications through.
-* **Keys** — `webkey` and `active_webkey`, the Zitadel signing keys an
-  application can verify a token with, and `application_key`, the key an
-  application authenticates itself with.
+* **Keys** — `active_webkey`, which points at the signing key Zitadel signs with.
 * **The rest** — `application_saml`, a SAML application alongside the API and OIDC
-  ones, and `project_member`, which grants a user a role on a project.
+  ones.
 
 Nine of the Terraform provider's 89 resources are deliberately not modelled, and
 the reasons are written down rather than left implicit:
