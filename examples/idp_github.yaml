@@ -1,0 +1,28 @@
+# An identity provider that lets users sign in with GitHub.
+#
+# It is available to every organization that has not set up its own.
+#
+# Zitadel does not report this kind's settings back, so they are applied once at
+# creation and are not drift detected: changing one means deleting the provider
+# and making it again. Only the name, the state and whether it registers users
+# automatically are compared.
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: IDPGitHub
+metadata:
+  name: example-github
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    clientID: "Iv1.0000000000000000"
+    clientSecretSecretRef: {name: example-github-credentials, key: clientsecret}
+    state: Active
+#
+# A credential is read from a secret rather than written here, and Zitadel
+# never returns one either, so it is applied but never compared. Make the
+# secret with a command like the one below, then point the references above
+# at it.
+#
+#   kubectl -n zitadel create secret generic example-github-credentials \
+#     --from-literal=clientsecret=... \

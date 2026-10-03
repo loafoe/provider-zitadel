@@ -1,0 +1,24 @@
+# An identity provider that lets users sign in with a SAML 2.0 identity provider.
+#
+# It is available to every organization that has not set up its own.
+#
+# Zitadel does not report this kind's settings back, so they are applied once at
+# creation and are not drift detected: changing one means deleting the provider
+# and making it again. Only the name, the state and whether it registers users
+# automatically are compared.
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: IDPSAML
+metadata:
+  name: example-saml
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    metadata: |
+      <?xml version="1.0"?>
+<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata"
+                  entityID="https://idp.example.com"/>
+    binding: "POST"
+    nameIDFormat: "EmailAddress"
+    state: Active

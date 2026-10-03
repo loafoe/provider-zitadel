@@ -58,7 +58,12 @@ type IdentityProvider struct {
 	ID   string
 	Name string
 	// State is `Active` or `Inactive`.
-	State        string
+	State string
+
+	// AutoRegister is whether a user is created without asking on first login.
+	// It is the one provider option Zitadel reports; the rest - linking,
+	// creation and auto-update - it does not, so they are applied once and are
+	// never compared.
 	AutoRegister bool
 
 	// OIDC is set when Zitadel returned the configuration of an OIDC provider,
@@ -117,7 +122,39 @@ func (s idpScope) String() string {
 }
 
 // GetIdentityProvider returns one identity provider.
+//
+// The by-ID read is tried first, because it is precise. For a kind whose
+// configuration Zitadel does not expose it answers "Identity Provider
+// Configuration doesn't exist" even though the provider is there - the same
+// read-side gap that makes those settings unreadable in the first place. So a
+// not-found is retried against the list, which reports every provider
+// regardless of its kind.
 func (c *Client) GetIdentityProvider(ctx context.Context, orgID, idpID string) (*IdentityProvider, error) {
+	p, err := c.getIdentityProviderByID(ctx, orgID, idpID)
+	if err == nil {
+		return p, nil
+	}
+
+	if !IsNotFound(err) {
+		return nil, err
+	}
+
+	all, lerr := c.ListIdentityProviders(ctx, orgID)
+	if lerr != nil {
+		// The provider is reported as gone only when the list agrees.
+		return nil, err
+	}
+
+	for i := range all {
+		if all[i].ID == idpID {
+			return &all[i], nil
+		}
+	}
+
+	return nil, ErrNotFound
+}
+
+func (c *Client) getIdentityProviderByID(ctx context.Context, orgID, idpID string) (*IdentityProvider, error) {
 	var p *idpv1.IDP
 
 	if orgID != "" {

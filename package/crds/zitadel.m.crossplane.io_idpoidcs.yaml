@@ -1,0 +1,314 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: idpoidcs.zitadel.m.crossplane.io
+spec:
+  group: zitadel.m.crossplane.io
+  names:
+    categories:
+    - crossplane
+    - managed
+    - zitadel
+    kind: IDPOIDC
+    listKind: IDPOIDCList
+    plural: idpoidcs
+    singular: idpoidc
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.atProvider.state
+      name: State
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          An IDPOIDC lets users log in through any OpenID Connect provider.
+
+          It is available to every organization that has not set up its own. Deleting
+          it removes it from the instance.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: IDPOIDCSpec defines the desired state of an IDPOIDC.
+            properties:
+              forProvider:
+                description: IDPOIDCParameters are the configurable fields of an IDPOIDC.
+                properties:
+                  autoLinking:
+                    description: |-
+                      How an account is matched without asking: by `Email` or by `Username`.
+                      Needs `isLinkingAllowed`.
+                    enum:
+                    - Email
+                    - Username
+                    type: string
+                  clientID:
+                    description: The OAuth client ID issued by the provider.
+                    type: string
+                  clientSecretSecretRef:
+                    description: |-
+                      The OAuth client secret, read from a secret. Zitadel never returns it, so
+                      it is applied but never compared.
+                    properties:
+                      key:
+                        description: Key inside the secret.
+                        minLength: 1
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        minLength: 1
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
+                  isAutoCreation:
+                    description: |-
+                      Create the user without asking, when the provider says the email address is
+                      verified. Needs `isCreationAllowed`.
+                    type: boolean
+                  isAutoUpdate:
+                    description: |-
+                      Refresh a linked user's profile on every login, rather than only when they
+                      log in to an existing account.
+                    type: boolean
+                  isCreationAllowed:
+                    description: Let a user be created on first login through this
+                      provider.
+                    type: boolean
+                  isIDTokenMapping:
+                    description: |-
+                      Build the user's profile from the ID token instead of calling the userinfo
+                      endpoint.
+                    type: boolean
+                  isLinkingAllowed:
+                    description: |-
+                      Let an existing Zitadel account be linked to a new external one that has
+                      the same email address.
+                    type: boolean
+                  issuer:
+                    description: The issuer URL. Zitadel discovers the provider's
+                      endpoints from it.
+                    type: string
+                  name:
+                    description: Name of the provider, as it appears on the login
+                      page.
+                    type: string
+                  scopes:
+                    description: |-
+                      The OAuth scopes requested from the provider, such as `openid email
+                      profile`.
+                    items:
+                      type: string
+                    type: array
+                  state:
+                    description: |-
+                      Whether the provider is offered on the login page. One of `Active` or
+                      `Inactive`. An inactive provider keeps its settings and its user links.
+                      Defaults to `Active`.
+                    enum:
+                    - Active
+                    - Inactive
+                    type: string
+                  usePKCE:
+                    description: Use proof key for code exchange, which public clients
+                      require.
+                    type: boolean
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: |-
+                  THIS IS A BETA FIELD. It is on by default but can be opted out
+                  through a Crossplane feature flag.
+                  ManagementPolicies specify the array of actions Crossplane is allowed to
+                  take on the managed and external resources.
+                  See the design doc for more information: https://github.com/crossplane/crossplane/blob/499895a25d1a1a0ba1604944ef98ac7a1a71f197/design/design-doc-observe-only-resources.md?plain=1#L223
+                  and this one: https://github.com/crossplane/crossplane/blob/444267e84783136daa93568b364a5f01228cacbe/design/one-pager-ignore-changes.md
+                items:
+                  description: |-
+                    A ManagementAction represents an action that the Crossplane controllers
+                    can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
+              providerConfigRef:
+                default:
+                  kind: ClusterProviderConfig
+                  name: default
+                description: |-
+                  ProviderConfigReference specifies how the provider that will be used to
+                  create, observe, update, and delete this managed resource should be
+                  configured.
+                properties:
+                  kind:
+                    description: Kind of the referenced object.
+                    type: string
+                  name:
+                    description: Name of the referenced object.
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+              writeConnectionSecretToRef:
+                description: |-
+                  WriteConnectionSecretToReference specifies the namespace and name of a
+                  Secret to which any connection details for this managed resource should
+                  be written. Connection details frequently include the endpoint, username,
+                  and password required to connect to the managed resource.
+                properties:
+                  name:
+                    description: Name of the secret.
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - forProvider
+            type: object
+          status:
+            description: IDPOIDCStatus is the observed state of an IDPOIDC.
+            properties:
+              atProvider:
+                description: |-
+                  IDPObservation is what Zitadel reports about an identity provider.
+
+                  Every provider kind reports the same things, and reports a configuration only
+                  for an OIDC or a JWT provider, so all twenty three kinds share this one type.
+                  The fields that stay empty for the other kinds are exactly the ones Zitadel
+                  does not read back - which is also why their spec fields are applied once and
+                  never compared.
+                properties:
+                  clientID:
+                    type: string
+                  headerName:
+                    type: string
+                  id:
+                    description: ID is Zitadel's identifier of the provider.
+                    type: string
+                  isAutoCreation:
+                    description: IsAutoCreation is whether a user is created without
+                      asking on first login.
+                    type: boolean
+                  issuer:
+                    description: Issuer, ClientID and Scopes are reported for an OIDC
+                      provider.
+                    type: string
+                  jwtEndpoint:
+                    description: JWTEndpoint, KeysEndpoint and HeaderName are reported
+                      for a JWT provider.
+                    type: string
+                  keysEndpoint:
+                    type: string
+                  name:
+                    description: Name of the provider.
+                    type: string
+                  organizationID:
+                    description: |-
+                      OrganizationID is the organization the provider belongs to. Empty for an
+                      instance wide provider.
+                    type: string
+                  scope:
+                    description: Scope is the organization the provider was last read
+                      from.
+                    type: string
+                  scopes:
+                    items:
+                      type: string
+                    type: array
+                  state:
+                    description: State is whether the provider is offered on the login
+                      page.
+                    type: string
+                type: object
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  description: A Condition that may apply to a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        LastTransitionTime is the last time this condition transitioned from one
+                        status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A Message containing details about this condition's last transition from
+                        one status to another, if any.
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      type: integer
+                    reason:
+                      description: A Reason for this condition's last transition from
+                        one status to another.
+                      type: string
+                    status:
+                      description: Status of this condition; is it currently True,
+                        False, or Unknown?
+                      type: string
+                    type:
+                      description: |-
+                        Type of this condition. At most one of each condition type may apply to
+                        a resource at any point in time.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the latest metadata.generation
+                  which resulted in either a ready state, or stalled due to error
+                  it can not recover from without human intervention.
+                format: int64
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

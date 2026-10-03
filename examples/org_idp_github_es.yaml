@@ -1,0 +1,34 @@
+# An identity provider that lets users sign in with a self hosted GitHub Enterprise Server.
+#
+# It belongs to one organization. Zitadel refuses to remove a provider that is
+# still offered on a login page, so it has to be unbound from the login policy
+# first.
+#
+# Zitadel does not report this kind's settings back, so they are applied once at
+# creation and are not drift detected: changing one means deleting the provider
+# and making it again. Only the name, the state and whether it registers users
+# automatically are compared.
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: OrgIDPGitHubEnterpriseServer
+metadata:
+  name: example-github-enterprise
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    clientID: "my-client-id"
+    authorizationEndpoint: "https://github.example.com/login/oauth/authorize"
+    tokenEndpoint: "https://github.example.com/login/oauth/access_token"
+    userEndpoint: "https://github.example.com/api/v3/user"
+    clientSecretSecretRef: {name: example-github-enterprise-credentials, key: clientsecret}
+    organizationRef: {name: platform}
+    state: Active
+#
+# A credential is read from a secret rather than written here, and Zitadel
+# never returns one either, so it is applied but never compared. Make the
+# secret with a command like the one below, then point the references above
+# at it.
+#
+#   kubectl -n zitadel create secret generic example-github-enterprise-credentials \
+#     --from-literal=clientsecret=... \

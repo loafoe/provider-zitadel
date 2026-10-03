@@ -1,0 +1,19 @@
+# An identity provider that lets users authenticate a machine by a JWT it presents, rather than a person logging in.
+#
+# It belongs to one organization. Zitadel refuses to remove a provider that is
+# still offered on a login page, so it has to be unbound from the login policy
+# first.
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: OrgIDPJWT
+metadata:
+  name: example-jwt
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    jwtEndpoint: "https://example.com/jwt"
+    issuer: "https://example.com"
+    headerName: "Authorization"
+    organizationRef: {name: platform}
+    state: Active

@@ -37,6 +37,13 @@ import (
 type ProviderInput struct {
 	Name string
 
+	// State is whether the provider is offered on the login page, as `Active` or
+	// `Inactive`. An empty state leaves Zitadel's default alone.
+	//
+	// Activating and deactivating is a call of its own rather than part of
+	// updating a provider, which is why it is set separately.
+	State string
+
 	ClientID     string
 	ClientSecret string
 	Issuer       string

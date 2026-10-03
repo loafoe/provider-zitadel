@@ -52,6 +52,8 @@ team.
 | `ActionExecutionFunction` | Action targets to call when another action calls a named function. |
 | `TriggerActions` | Actions to run at a point in a login flow, such as once a user has authenticated. |
 | `LockoutPolicy` … `DefaultSecuritySettings` | The seven organization policies, and the ten instance-wide policies they inherit from. |
+| `IDPOIDC`, `IDPOAuth`, `IDPApple`, `IDPAzureAD`, `IDPGitHub`, `IDPGitHubEnterpriseServer`, `IDPGitLab`, `IDPGitLabSelfHosted`, `IDPGoogle`, `IDPLDAP`, `IDPSAML` | Identity providers available to every organization that has not set up its own. |
+| `OrgIDPOIDC`, `OrgIDPOAuth`, `OrgIDPJWT`, `OrgIDPApple`, `OrgIDPAzureAD`, `OrgIDPGitHub`, `OrgIDPGitHubEnterpriseServer`, `OrgIDPGitLab`, `OrgIDPGitLabSelfHosted`, `OrgIDPGoogle`, `OrgIDPLDAP`, `OrgIDPSAML` | The same providers, belonging to one organization. |
 
 All managed resources are namespaced, in `zitadel.m.crossplane.io/v1alpha1`.
 `ProviderConfig` stays cluster wide in `zitadel.crossplane.io/v1alpha1`, so one
@@ -76,6 +78,40 @@ at when a manifest fails:
 * **Actions** — `Action`, `ActionTarget`, `ActionTargetPublicKey`, and the five
   bindings that say when a target is called: four execution kinds plus
   `TriggerActions`.
+* **Identity providers** — twelve provider types, each in two forms: one
+  available to the whole instance (`IDPGitHub`) and one belonging to an
+  organization (`OrgIDPGitHub`). Twenty three kinds in all, and the last block
+  of the Terraform provider's surface.
+
+### What Zitadel will and will not read back
+
+This is the single most important thing to know about identity providers, and it
+shapes every one of the twenty three kinds.
+
+Zitadel returns an identity provider's **name, state, and whether it registers
+users automatically** — and its configuration **only for an OIDC or a JWT
+provider**. For the other twenty one, the by-ID read answers `Identity Provider
+Configuration doesn't exist` and the list leaves them out, even after they have
+been created.
+
+So for those twenty one:
+
+- their settings are applied once, at creation, and are **not** drift detected;
+- changing one means deleting the provider and making it again;
+- their existence is taken from the identifier they were created with, because
+  there is nothing in Zitadel to read it back from.
+
+`OrgIDPOIDC` and `OrgIDPJWT` are the exception and get real drift detection on
+their issuer, endpoints, scopes, client ID and header. A credential — a client
+secret, a bind password, a signing key — is never returned by Zitadel either, so
+one is applied and then left alone, and is read from a secret rather than
+written into the manifest.
+
+### A credential has no safe place in a manifest
+
+A client secret or a directory bind password in a custom resource would be
+readable by anyone who can read the object and would end up in git. Every
+credential is therefore a `SecretKeySelector`, read when the provider is called.
 
 ### Two kinds of role keys
 
@@ -336,6 +372,17 @@ A few Zitadel specifics the provider works around:
   `OrganizationMetadata` manage the complete set of one subject rather than one
   key each: two resources each writing part of a set would both see the other's
   keys as drift and fight over them.
+* **An identity provider Zitadel cannot read back.** Only an OIDC and a JWT
+  provider are: for every other kind the by-ID read answers "Identity Provider
+  Configuration doesn't exist" and the list omits it, even after it has been
+  created. Those kinds are created and removed successfully but cannot be
+  observed, so their existence is taken from the identifier they were created
+  with, and no drift detection is claimed for them. See "What Zitadel will and
+  will not read back" above.
+* **An identity provider is unbound before it is removed.** Zitadel refuses to
+  remove one that is still offered on a login page, so it has to come off the
+  login policy first - the same rule that applies to an action something still
+  calls.
 * **Login policy factor lists are diffed.** `UpdateCustomLoginPolicy` does not
   accept second or multi factor lists, so the provider adds and removes them
   through the dedicated endpoints.
@@ -546,12 +593,12 @@ Natural next steps, roughly in the order they tend to be needed:
 ### Coverage against the Terraform provider
 
 The official Zitadel Terraform provider registers **89** managed resources. This
-provider currently models **42** of them, one for one:
+provider currently models **65** of them, one for one:
 
 | | |
 |---|---|
-| Raw parity | 42 / 89 = **47%** |
-| Adjusted parity | 42 / 84 = **50%** |
+| Raw parity | 65 / 89 = **73%** |
+| Adjusted parity | 65 / 84 = **77%** |
 
 The adjusted figure drops five of the 89: two localisation resources
 (`default_hosted_login_translation`, `hosted_login_translation`), which carry
@@ -559,19 +606,17 @@ translated UI text rather than infrastructure, and three deprecated aliases
 (`zitadel_org`, `zitadel_project_v2`, `zitadel_application_v2`) kept only for
 backwards compatibility and shadowed by kinds this provider models directly.
 
-What is left - 42 of the 84 worth modelling - clusters into three groups:
+What is left — 19 of the 84 worth modelling — is:
 
-* **Identity providers** — 23 resources (`idp_google`, `org_idp_ldap`, …). The
-  largest single block, and repetitive: each provider is the same wiring with a
-  different endpoint.
-* **Instance level** — 7 resources (`instance_features`, `system_features`,
+* **Instance level** — `instance_features`, `system_features`,
   `instance_restrictions`, `instance_custom_domain`, `instance_trusted_domain`,
-  `instance_secret_generator`, `smtp_config`). Note that `instance_features` and
-  `system_features` only toggle flags, so they have no identity of their own to
-  reconcile.
-* **The rest** — 11 resources: `application_saml`, `application_key`, `domain`,
-  `organization_domain`, `org_metadata`, `webkey`, `active_webkey`,
-  `project_member`, and the four `email_provider_*` and `sms_provider_*` kinds.
+  `instance_secret_generator`. The first two only toggle flags, so they have no
+  identity of their own to reconcile.
+* **Messaging** — `smtp_config`, `email_provider_http`, `email_provider_smtp`,
+  `sms_provider_http`, `sms_provider_twilio`.
+* **The rest** — `application_saml`, `application_key`, `domain`,
+  `organization_domain`, `org_metadata`, `webkey`, `active_webkey` and
+  `project_member`.
 
 Counts are reproducible from the Terraform provider's own resource registry:
 

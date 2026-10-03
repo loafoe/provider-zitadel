@@ -1,0 +1,30 @@
+# An identity provider that lets users sign in with Apple.
+#
+# It is available to every organization that has not set up its own.
+#
+# Zitadel does not report this kind's settings back, so they are applied once at
+# creation and are not drift detected: changing one means deleting the provider
+# and making it again. Only the name, the state and whether it registers users
+# automatically are compared.
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: IDPApple
+metadata:
+  name: example-apple
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    clientID: "com.example.service"
+    teamID: "ABCDE12345"
+    keyID: "FGHIJ67890"
+    privateKeySecretRef: {name: example-apple-credentials, key: privatekey}
+    state: Active
+#
+# A credential is read from a secret rather than written here, and Zitadel
+# never returns one either, so it is applied but never compared. Make the
+# secret with a command like the one below, then point the references above
+# at it.
+#
+#   kubectl -n zitadel create secret generic example-apple-credentials \
+#     --from-literal=privatekey=... \

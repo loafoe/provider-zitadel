@@ -26,8 +26,10 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reference"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/loafoe/provider-zitadel/apis/zitadel/v1alpha1"
@@ -519,4 +521,39 @@ func ResolveTargetID(ctx context.Context, kube client.Client, mg resource.Modern
 	}
 
 	return rsp.ResolvedValue, nil
+}
+
+// EqualStringPointers reports whether an optional string matches what Zitadel
+// reports.
+//
+// A field the operator never set is not compared, so Zitadel's own default is
+// never fought over.
+func EqualStringPointers(want *string, got string) bool {
+	if want == nil {
+		return true
+	}
+
+	return *want == got
+}
+
+// SecretValue reads a key out of a secret.
+//
+// A credential has no safe place in a custom resource - it would be readable by
+// anyone who can read the object, and it would be written down in git - so a
+// managed resource points at a secret instead and the value is read when the
+// provider is called.
+//
+// Zitadel never returns a client secret, a bind password or a signing key
+// either, so a value read this way is applied but never compared.
+func SecretValue(ctx context.Context, kube client.Client, ns string, ref *v1alpha1.SecretKeySelector) string {
+	if ref == nil || ref.Name == "" || ref.Key == "" {
+		return ""
+	}
+
+	s := &corev1.Secret{}
+	if err := kube.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: ns}, s); err != nil {
+		return ""
+	}
+
+	return string(s.Data[ref.Key])
 }

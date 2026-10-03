@@ -39,6 +39,7 @@ import (
 	"github.com/loafoe/provider-zitadel/internal/controller/default_security_settings"
 	"github.com/loafoe/provider-zitadel/internal/controller/domain_policy"
 	"github.com/loafoe/provider-zitadel/internal/controller/humanuser"
+	"github.com/loafoe/provider-zitadel/internal/controller/idp"
 	"github.com/loafoe/provider-zitadel/internal/controller/instancemember"
 	"github.com/loafoe/provider-zitadel/internal/controller/label_policy"
 	"github.com/loafoe/provider-zitadel/internal/controller/lockout_policy"
@@ -106,6 +107,10 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		privacy_policy.Setup,
 		domain_policy.Setup,
 		label_policy.Setup,
+
+		// Identity providers, at both levels. One package, because all twenty
+		// three kinds are one resource with a different field set.
+		idp.Setup,
 
 		// Actions and the things they are called at.
 		action.Setup,

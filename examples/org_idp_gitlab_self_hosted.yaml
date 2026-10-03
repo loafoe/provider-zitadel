@@ -1,0 +1,32 @@
+# An identity provider that lets users sign in with a self hosted GitLab.
+#
+# It belongs to one organization. Zitadel refuses to remove a provider that is
+# still offered on a login page, so it has to be unbound from the login policy
+# first.
+#
+# Zitadel does not report this kind's settings back, so they are applied once at
+# creation and are not drift detected: changing one means deleting the provider
+# and making it again. Only the name, the state and whether it registers users
+# automatically are compared.
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: OrgIDPGitLabSelfHosted
+metadata:
+  name: example-gitlab-self-hosted
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    issuer: "https://gitlab.example.com"
+    clientID: "my-client-id"
+    clientSecretSecretRef: {name: example-gitlab-self-hosted-credentials, key: clientsecret}
+    organizationRef: {name: platform}
+    state: Active
+#
+# A credential is read from a secret rather than written here, and Zitadel
+# never returns one either, so it is applied but never compared. Make the
+# secret with a command like the one below, then point the references above
+# at it.
+#
+#   kubectl -n zitadel create secret generic example-gitlab-self-hosted-credentials \
+#     --from-literal=clientsecret=... \
