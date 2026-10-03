@@ -287,8 +287,35 @@ func (l *IDPSAMLList) GetItems() []resource.Managed {
 	return items
 }
 
+// GetItems of this InstanceFeaturesList.
+func (l *InstanceFeaturesList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
 // GetItems of this InstanceMemberList.
 func (l *InstanceMemberList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this InstanceRestrictionsList.
+func (l *InstanceRestrictionsList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this InstanceSecretGeneratorList.
+func (l *InstanceSecretGeneratorList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]
@@ -559,6 +586,15 @@ func (l *ProjectRoleList) GetItems() []resource.Managed {
 
 // GetItems of this ServiceAccountList.
 func (l *ServiceAccountList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this SystemFeaturesList.
+func (l *SystemFeaturesList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]

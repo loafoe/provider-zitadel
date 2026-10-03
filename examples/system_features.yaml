@@ -1,0 +1,22 @@
+# An example of a Zitadel system feature flags.
+#
+# Apply it with:
+#
+#     kubectl apply -f system_features.yaml
+#
+# This manages state that belongs to the whole Zitadel instance, so two of these
+# in different namespaces would be asking for the same settings and the second
+# would win. Only one at a time.
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: SystemFeatures
+metadata:
+  name: zitadel-system-features
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    loginDefaultOrg: true
+    userSchema: false

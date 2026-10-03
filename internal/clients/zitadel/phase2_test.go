@@ -21,6 +21,9 @@ import (
 	"strings"
 	"testing"
 
+	feature "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/feature/v2"
+	settings "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/settings"
+
 	"github.com/google/go-cmp/cmp"
 	policyv1 "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/policy"
 	"google.golang.org/grpc/codes"
@@ -353,5 +356,55 @@ func TestIsRoleNotFound(t *testing.T) {
 				t.Errorf("isRoleNotFound(%v) = %t, want %t", tc.err, got, tc.want)
 			}
 		})
+	}
+}
+
+// Zitadel sends these enums as numbers, so string(p) yields the character with
+// that code point rather than the name.
+//
+// This is the bug a compile, a vet and a lint pass all agree with: the value
+// only goes wrong once Zitadel answers, which is exactly when a live test is
+// the only thing that catches it.
+func TestEnumNamesAreReadRatherThanStringified(t *testing.T) {
+	// These are the values Zitadel returns, as the numbers it sends them as.
+	for _, tc := range []struct {
+		got  int32
+		want string
+	}{
+		{1, "SECRET_GENERATOR_TYPE_INIT_CODE"},
+		{6, "SECRET_GENERATOR_TYPE_APP_SECRET"},
+	} {
+		got, ok := settings.SecretGeneratorType_name[tc.got]
+		if !ok {
+			t.Errorf("no name for the generator type %d", tc.got)
+			continue
+		}
+		if got != tc.want {
+			t.Errorf("the generator type %d read as %q, want %q", tc.got, got, tc.want)
+		}
+
+		// What the bug produced instead.
+		if string(tc.got) == tc.want {
+			t.Errorf("the generator type %d stringifies to its own name, which is the "+
+				"coincidence this test guards against", tc.got)
+		}
+	}
+
+	for _, tc := range []struct {
+		got  int32
+		want string
+	}{
+		{2, "IMPROVED_PERFORMANCE_PROJECT_GRANT"},
+		{3, "IMPROVED_PERFORMANCE_PROJECT"},
+		{4, "IMPROVED_PERFORMANCE_USER_GRANT"},
+	} {
+		got, ok := feature.ImprovedPerformance_name[tc.got]
+		if !ok {
+			t.Errorf("no name for the improved performance value %d", tc.got)
+			continue
+		}
+		if got != tc.want {
+			t.Errorf("the improved performance value %d read as %q, want %q", tc.got, got, tc.want)
+		}
 	}
 }

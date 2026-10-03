@@ -40,6 +40,7 @@ import (
 	userv2 "github.com/zitadel/zitadel-go/v3/pkg/client/user/v2"
 	"github.com/zitadel/zitadel-go/v3/pkg/client/zitadel"
 	actionapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/action/v2"
+	featureapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/feature/v2"
 	settingsapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/settings/v2"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
@@ -113,6 +114,11 @@ type Client struct {
 	settings     settingsapi.SettingsServiceClient
 	settingsConn *zitadel.Connection
 	actionConn   *zitadel.Connection
+
+	// The v2 feature service holds the instance and system wide feature flags,
+	// which are the only Zitadel surface that reads or writes them.
+	feature     featureapi.FeatureServiceClient
+	featureConn *zitadel.Connection
 
 	// The v1 admin API is the only API that manages instance memberships (IAM
 	// roles), instance settings and the domain policy. Most of it is instance
@@ -207,6 +213,8 @@ func endpoints(cfg Config) (issuer, api string, err error) {
 
 // NewClient creates a new Zitadel API client. The returned client opens gRPC
 // connections lazily; use Close to release them.
+//
+//nolint:gocyclo // one step per connection, each of which can fail.
 func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 	issuer, api, err := endpoints(cfg)
 	if err != nil {
@@ -278,6 +286,15 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 
 	st := settingsapi.NewSettingsServiceClient(stConn.ClientConn)
 
+	// The feature service is generated without a convenience constructor too.
+	ftConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
+	if err != nil {
+		closeAll()
+		return nil, fmt.Errorf("cannot create zitadel feature connection: %w", err)
+	}
+
+	ft := featureapi.NewFeatureServiceClient(ftConn.ClientConn)
+
 	return &Client{
 		user:         u,
 		project:      p,
@@ -286,6 +303,8 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 		admin:        ad,
 		action:       act,
 		actionConn:   actConn,
+		feature:      ft,
+		featureConn:  ftConn,
 		settings:     st,
 		settingsConn: stConn,
 		issuer:       issuer,
@@ -335,7 +354,7 @@ func connectionOptions(ctx context.Context, cfg Config, issuer, api string) []zi
 func (c *Client) Close() error {
 	var errs []error
 
-	for _, conn := range []interface{ Close() error }{c.user.Connection, c.project.Connection, c.application.Connection, c.org.Connection, c.admin.Connection, c.settingsConn, c.actionConn} {
+	for _, conn := range []interface{ Close() error }{c.user.Connection, c.project.Connection, c.application.Connection, c.org.Connection, c.admin.Connection, c.settingsConn, c.actionConn, c.featureConn} {
 		if conn == nil {
 			continue
 		}

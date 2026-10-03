@@ -234,6 +234,17 @@ func (e *policyExternal[P, O, CR]) Create(ctx context.Context, mg resource.Manag
 		return managed.ExternalCreation{}, err
 	}
 
+	// The value this is about to overwrite is recorded before the write, not only
+	// on the way through Update.
+	//
+	// A resource that is created once and never edited otherwise reaches no
+	// Update at all, so recording there alone would leave a policy Zitadel
+	// cannot reset with no restore point: deleting it would then leave the scope
+	// configured by a manifest that no longer exists.
+	if err := e.recordRestorePoint(ctx, cr, scope); err != nil {
+		return managed.ExternalCreation{}, err
+	}
+
 	return managed.ExternalCreation{}, e.d.Apply(ctx, e.zc, scope, e.d.Desired(cr))
 }
 

@@ -52,6 +52,7 @@ team.
 | `ActionExecutionFunction` | Action targets to call when another action calls a named function. |
 | `TriggerActions` | Actions to run at a point in a login flow, such as once a user has authenticated. |
 | `LockoutPolicy` … `DefaultSecuritySettings` | The seven organization policies, and the ten instance-wide policies they inherit from. |
+| `InstanceFeatures`, `SystemFeatures`, `InstanceRestrictions`, `InstanceSecretGenerator` | The four instance wide settings that are a single value: the feature flags, the registration restrictions, and the shape of one of Zitadel's generated codes. |
 | `IDPOIDC`, `IDPOAuth`, `IDPApple`, `IDPAzureAD`, `IDPGitHub`, `IDPGitHubEnterpriseServer`, `IDPGitLab`, `IDPGitLabSelfHosted`, `IDPGoogle`, `IDPLDAP`, `IDPSAML` | Identity providers available to every organization that has not set up its own. |
 | `OrgIDPOIDC`, `OrgIDPOAuth`, `OrgIDPJWT`, `OrgIDPApple`, `OrgIDPAzureAD`, `OrgIDPGitHub`, `OrgIDPGitHubEnterpriseServer`, `OrgIDPGitLab`, `OrgIDPGitLabSelfHosted`, `OrgIDPGoogle`, `OrgIDPLDAP`, `OrgIDPSAML` | The same providers, belonging to one organization. |
 
@@ -78,6 +79,10 @@ at when a manifest fails:
 * **Actions** — `Action`, `ActionTarget`, `ActionTargetPublicKey`, and the five
   bindings that say when a target is called: four execution kinds plus
   `TriggerActions`.
+* **Instance settings** — `InstanceFeatures`, `SystemFeatures`,
+  `InstanceRestrictions` and `InstanceSecretGenerator`. The first three are the
+  singleton of the instance; the last is one per code type, so the generator
+  type is what tells two of them apart.
 * **Identity providers** — twelve provider types, each in two forms: one
   available to the whole instance (`IDPGitHub`) and one belonging to an
   organization (`OrgIDPGitHub`). Twenty three kinds in all, and the last block
@@ -383,6 +388,17 @@ A few Zitadel specifics the provider works around:
   remove one that is still offered on a login page, so it has to come off the
   login policy first - the same rule that applies to an action something still
   calls.
+* **An instance wide setting that Zitadel cannot reset is restored, not
+  removed.** There is no reset call for the registration restrictions or for a
+  secret generator, so the value the resource overwrote is recorded in the status
+  and written back on deletion. The recording has to happen *before* the first
+  write rather than on the first update: a resource created once and never
+  edited otherwise reaches no update at all, and would be deleted without putting
+  anything back.
+* **A recorded restore point has to be writable.** The harness writes one back
+  by reading it into the shape the write API accepts, so the observed type of
+  every non-resettable setting carries an `Input` method. Without it the restore
+  is refused and the instance keeps the values a deleted manifest wrote.
 * **Login policy factor lists are diffed.** `UpdateCustomLoginPolicy` does not
   accept second or multi factor lists, so the provider adds and removes them
   through the dedicated endpoints.
@@ -593,12 +609,12 @@ Natural next steps, roughly in the order they tend to be needed:
 ### Coverage against the Terraform provider
 
 The official Zitadel Terraform provider registers **89** managed resources. This
-provider currently models **65** of them, one for one:
+provider currently models **68** of them, one for one:
 
 | | |
 |---|---|
-| Raw parity | 65 / 89 = **73%** |
-| Adjusted parity | 65 / 84 = **77%** |
+| Raw parity | 68 / 89 = **76%** |
+| Adjusted parity | 68 / 80 = **85%** |
 
 The adjusted figure drops five of the 89: two localisation resources
 (`default_hosted_login_translation`, `hosted_login_translation`), which carry
@@ -606,19 +622,28 @@ translated UI text rather than infrastructure, and three deprecated aliases
 (`zitadel_org`, `zitadel_project_v2`, `zitadel_application_v2`) kept only for
 backwards compatibility and shadowed by kinds this provider models directly.
 
-What is left — 19 of the 84 worth modelling — is:
+What is left is 12 of the 80 worth modelling:
 
-* **Instance level** — `instance_features`, `system_features`,
-  `instance_restrictions`, `instance_custom_domain`, `instance_trusted_domain`,
-  `instance_secret_generator`. The first two only toggle flags, so they have no
-  identity of their own to reconcile.
-* **Messaging** — `smtp_config`, `email_provider_http`, `email_provider_smtp`,
-  `sms_provider_http`, `sms_provider_twilio`.
-* **The rest** — `application_saml`, `application_key`, `domain`,
-  `organization_domain`, `org_metadata`, `webkey`, `active_webkey` and
-  `project_member`.
+* **Domains** — `instance_custom_domain`, `instance_trusted_domain` and
+  `organization_domain`, which are all lists of names rather than settings.
+* **Messaging** — `email_provider_http`, `email_provider_smtp`,
+  `sms_provider_http` and `sms_provider_twilio`.
+* **The rest** — `application_saml`, `application_key`, `webkey`, `active_webkey`
+  and `project_member`.
 
-Counts are reproducible from the Terraform provider's own resource registry:
+Nine of the Terraform provider's 89 resources are deliberately not modelled, and
+the reasons are written down rather than left implicit:
+
+| Not modelled | Why |
+| --- | --- |
+| `hosted_login_translation`, `default_hosted_login_translation` | Static translation strings, not managed state. |
+| `application_api`, `application_oidc` | The v1 application API, superseded by the v2 API this provider uses. |
+| `org`, `project` | The v1 organization and project APIs, superseded by `organization` and `project_v2`. |
+| `domain`, `org_metadata`, `smtp_config` | Deprecated by the Terraform provider in favour of resources that are modelled. |
+
+`./hack/parity.py <path to terraform-provider-zitadel>` checks all of this against
+the Terraform provider's own source and exits non-zero while anything worth
+modelling is missing, so the figures above cannot drift away from it:
 
 ```console
 git clone --depth 1 --filter=blob:none --sparse \

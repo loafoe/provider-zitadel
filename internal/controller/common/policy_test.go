@@ -216,6 +216,65 @@ func TestDeleteRestoresWhatWasOverwritten(t *testing.T) {
 	}
 }
 
+// A resource that is created once and never edited reaches no Update at all, so
+// the value it is about to overwrite has to be recorded on the way through
+// Create as well.
+//
+// Recording it only on Update is the bug this covers: the restore point stayed
+// nil, deleting the resource succeeded without restoring anything, and the
+// instance was left configured by a manifest that no longer existed. Verified
+// against a live instance, where the restrictions and the init code generator
+// both survived their own deletion.
+func TestCreateRecordsTheValueItIsAboutToOverwrite(t *testing.T) {
+	d := &testDriver{resettable: false, observed: zitadel.LockoutPolicy{MaxPasswordAttempts: 9}}
+	e := newTestExternal(d)
+
+	cr := testResource()
+	if _, err := e.Create(context.Background(), cr); err != nil {
+		t.Fatal(err)
+	}
+
+	if cr.PolicyRestore() == nil {
+		t.Fatal("nothing was recorded, so deleting could not put the scope back")
+	}
+
+	if _, err := e.Delete(context.Background(), cr); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(d.applied) != 2 {
+		t.Fatalf("want one write and one restore, got %d: %v", len(d.applied), d.applied)
+	}
+
+	if d.applied[1].MaxPasswordAttempts != 9 {
+		t.Errorf("delete restored %d, want the 9 that was there before", d.applied[1].MaxPasswordAttempts)
+	}
+}
+
+// A policy that Zitadel cannot be reset has to be writable from a recorded
+// snapshot, which the harness finds through the Policy interface.
+//
+// This is the bug this covers: the observed type of the new instance settings
+// had no Input method, so the restore was refused with "cannot be restored from
+// a recorded value" and deleting the resource left the instance holding the
+// values its manifest had written. Verified against a live instance, where the
+// recorded restore point was right and was still never applied.
+func TestAnObservedPolicyCanBeWrittenBackFromARecord(t *testing.T) {
+	for name, observed := range map[string]any{
+		"a lockout policy": zitadel.LockoutPolicy{MaxPasswordAttempts: 5},
+		"the flags":        zitadel.FeatureFlags{LoginDefaultOrg: true},
+		"the restrictions": zitadel.Restrictions{DisallowPublicOrgRegistration: true},
+		"a generator":      zitadel.SecretGenerator{Length: 8},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, ok := observed.(Policy); !ok {
+				t.Errorf("%T has no Input method, so a recorded restore point can never be written back",
+					observed)
+			}
+		})
+	}
+}
+
 // A resettable policy must not record a restore point: deleting it resets, so
 // there is nothing to put back and reading the scope must not change anything.
 func TestUpdateDoesNotRecordARestorePointForAResettablePolicy(t *testing.T) {
@@ -229,6 +288,17 @@ func TestUpdateDoesNotRecordARestorePointForAResettablePolicy(t *testing.T) {
 
 	if cr.PolicyRestore() != nil {
 		t.Error("a policy that can be reset recorded a restore point")
+	}
+
+	// Creating one must not record it either, or deleting it would restore a
+	// value over the reset that is supposed to happen instead.
+	cr = testResource()
+	if _, err := e.Create(context.Background(), cr); err != nil {
+		t.Fatal(err)
+	}
+
+	if cr.PolicyRestore() != nil {
+		t.Error("creating a policy that can be reset recorded a restore point")
 	}
 }
 

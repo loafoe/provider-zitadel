@@ -1,0 +1,32 @@
+# An example of a Zitadel instance feature flags.
+#
+# Apply it with:
+#
+#     kubectl apply -f instance_features.yaml
+#
+# This manages state that belongs to the whole Zitadel instance, so two of these
+# in different namespaces would be asking for the same settings and the second
+# would win. Only one at a time.
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: InstanceFeatures
+metadata:
+  name: zitadel-features
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    # The login screen falls back to the default organization rather than to the
+    # organization's own settings when no organization context is set.
+    loginDefaultOrg: true
+    # The user schema API is early and may change between Zitadel releases.
+    userSchema: false
+    # Returns the underlying error to an OIDC client. It can reveal details about
+    # the system, so it is off unless it is being used to debug something.
+    debugOidcParentError: false
+    # Execution paths Zitadel may shortcut in exchange for less work on write.
+    improvedPerformance:
+      - IMPROVED_PERFORMANCE_PROJECT
+      - IMPROVED_PERFORMANCE_USER_GRANT
