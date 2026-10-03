@@ -1,0 +1,30 @@
+# A key a target's payloads are encrypted with, which is what makes the `Jwe`
+# payload type possible.
+#
+# A key cannot be changed in place: Zitadel ties it to the payload encryption of
+# the target, so rotating one means adding a new key, activating it, and removing
+# the old.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: ActionTargetPublicKey
+metadata:
+  name: platform-webhook-key
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    targetRef: {name: platform-webhook}
+    # An RSA or EC public key in PEM form. Zitadel parses it when it is added,
+    # so it has to be a real key rather than a placeholder.
+    publicKey: |
+      -----BEGIN PUBLIC KEY-----
+      MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy4iqvN8Z1QfYcJ7klO4C
+      LQVFyKTvr+Glp6htE6AxybNToRglKcen1Qn097hQEpRi1slUEACI8NwYokIg3jGy
+      rvNTNTCfha+MjkZEajnFFyO0c3TXfcVo2Sf7giDZRvt+Ha/Gutc1+/+UWvfpR3hU
+      INEdb+ec/nt20oF0HskuuawOnWYyJtUjYs62YX/PDtLj1tw+sqIlM1JcdfuLctye
+      b3xv0rQzD56Lxh/TgFTiAc/r3qjE7jP02ygHBaiD/8gSZSwMN0t8mwyIvQATzmTE
+      2olvhv2nxcBo1iaRIU4mH3VRiux/VK/ZtpkBknXt6O/T5yNTKNZSaXqZ1PJlg7PT
+      jQIDAQAB
+      -----END PUBLIC KEY-----
+    expirationDate: "2027-01-01T00:00:00Z"
+    # Only one key on a target encrypts at a time.
+    active: true

@@ -39,6 +39,7 @@ import (
 	projectv2 "github.com/zitadel/zitadel-go/v3/pkg/client/project/v2"
 	userv2 "github.com/zitadel/zitadel-go/v3/pkg/client/user/v2"
 	"github.com/zitadel/zitadel-go/v3/pkg/client/zitadel"
+	actionapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/action/v2"
 	settingsapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/settings/v2"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
@@ -104,10 +105,14 @@ type Client struct {
 	application *apiv2.Client
 	org         *orgv2.Client
 
+	// The v2 action service manages where actions are sent and when they run.
+	action actionapi.ActionServiceClient
+
 	// The v2 settings service is the only Zitadel surface that reads and writes
 	// the instance wide security settings.
 	settings     settingsapi.SettingsServiceClient
 	settingsConn *zitadel.Connection
+	actionConn   *zitadel.Connection
 
 	// The v1 admin API is the only API that manages instance memberships (IAM
 	// roles), instance settings and the domain policy. Most of it is instance
@@ -254,6 +259,15 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 	}
 	open = append(open, ad.Connection.ClientConn)
 
+	// The action service is generated without a convenience constructor either.
+	actConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
+	if err != nil {
+		closeAll()
+		return nil, fmt.Errorf("cannot create zitadel action connection: %w", err)
+	}
+
+	act := actionapi.NewActionServiceClient(actConn.ClientConn)
+
 	// The settings service is generated without a convenience constructor, so it
 	// gets its own connection here rather than sharing one of the others'.
 	stConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
@@ -270,6 +284,8 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 		application:  a,
 		org:          o,
 		admin:        ad,
+		action:       act,
+		actionConn:   actConn,
 		settings:     st,
 		settingsConn: stConn,
 		issuer:       issuer,
@@ -319,7 +335,7 @@ func connectionOptions(ctx context.Context, cfg Config, issuer, api string) []zi
 func (c *Client) Close() error {
 	var errs []error
 
-	for _, conn := range []interface{ Close() error }{c.user.Connection, c.project.Connection, c.application.Connection, c.org.Connection, c.admin.Connection, c.settingsConn} {
+	for _, conn := range []interface{ Close() error }{c.user.Connection, c.project.Connection, c.application.Connection, c.org.Connection, c.admin.Connection, c.settingsConn, c.actionConn} {
 		if conn == nil {
 			continue
 		}
@@ -364,13 +380,15 @@ func IsNotChanged(err error) bool {
 	}
 
 	// Zitadel spells this differently per endpoint: some say "No changes", some
-	// carry a "NotChanged" error code, and the private label policy phrases it
-	// as "has not been changed".
+	// carry a "NotChanged" error code, the private label policy phrases it as
+	// "has not been changed", and an action that is already active says it "is
+	// not inactive".
 	msg := st.Message()
 
 	return strings.Contains(msg, "NotChanged") ||
 		strings.Contains(msg, "No changes") ||
-		strings.Contains(msg, "has not been changed")
+		strings.Contains(msg, "has not been changed") ||
+		strings.Contains(msg, "is not inactive")
 }
 
 // grpcStatus extracts the gRPC status of an error.

@@ -1,0 +1,20 @@
+# Bind ActionTargets to a Zitadel event.
+#
+# Zitadel gives a binding no identifier of its own: the condition is the
+# identity, and reading one back means listing every binding and matching.
+# Deleting this resource clears the binding rather than removing it, because that
+# is the only thing Zitadel can do.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: ActionExecutionEvent
+metadata:
+  name: on-user-created
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    # The ActionTargets to call.
+    targetIDs: []
+    # Exactly one of event, group or all must be set. Zitadel names these
+    # user.human.added, user.human.changed and so on, and rejects anything it
+    # does not know.
+    event: user.human.added

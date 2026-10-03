@@ -481,3 +481,42 @@ func EnumValues[T ~string](values []string) []T {
 
 	return out
 }
+
+// ResolveTargetID resolves a reference that must point at an ActionTarget.
+//
+// A target is an instance wide object, so this is the one place where a
+// reference is resolved against a kind rather than by pinning an ID: the
+// reference is deliberately narrow, so a key cannot be attached to a target the
+// provider does not manage.
+func ResolveTargetID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv1.Reference, selector *xpv1.Selector, direct *string) (string, error) {
+	if ref == nil && selector == nil {
+		if direct == nil {
+			return "", errors.Join(ErrNoUserID, errors.New("either targetID, targetRef or targetSelector must be set"))
+		}
+
+		return *direct, nil
+	}
+
+	rsp, err := reference.NewAPIResolver(kube, mg).Resolve(ctx, reference.ResolutionRequest{
+		Reference: ref,
+		Selector:  selector,
+		To: reference.To{
+			Managed: &v1alpha1.ActionTarget{},
+			List:    &v1alpha1.ActionTargetList{},
+		},
+		Extract: func(mg resource.Managed) string {
+			t, ok := mg.(*v1alpha1.ActionTarget)
+			if !ok {
+				return ""
+			}
+
+			return t.Status.AtProvider.ID
+		},
+		Namespace: mg.GetNamespace(),
+	})
+	if err != nil {
+		return "", errors.Join(ErrResolveUser, err)
+	}
+
+	return rsp.ResolvedValue, nil
+}

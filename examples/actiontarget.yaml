@@ -1,0 +1,26 @@
+# Somewhere an action's payload is sent.
+#
+# Zitadel generates a signing key for each target and publishes it to the
+# connection secret, so the receiving side can verify what it gets. The key is
+# generated once and never changes.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: ActionTarget
+metadata:
+  name: platform-webhook
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  writeConnectionSecretToRef: {name: platform-webhook}
+  forProvider:
+    name: Platform webhook
+    # Webhook POSTs the payload and checks only the status code. Call uses the
+    # response as the next step of the flow, and Async does not wait.
+    type: Webhook
+    # Zitadel resolves the endpoint when the target is created and refuses a
+    # host that does not resolve, so this has to be a real host even when the
+    # webhook is not there yet.
+    endpoint: https://example.com/zitadel
+    timeout: "10s"
+    # Json, Jwt, or Jwe. Jwe encrypts the payload to the target's active
+    # ActionTargetPublicKey, so the key has to exist first.
+    payloadType: Json

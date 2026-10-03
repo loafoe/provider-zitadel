@@ -43,6 +43,15 @@ team.
 | `UserMetadata` | The complete metadata set of a user. |
 | `OrganizationMetadata` | The complete metadata set of an organization. |
 | `LoginPolicy` | The login policy of an organization: registration, MFA, password lifetimes. |
+| `Action` | A JavaScript snippet Zitadel runs at a point in a login flow. |
+| `ActionTarget` | Somewhere an action's payload is sent: a webhook, a call, or an asynchronous request. |
+| `ActionTargetPublicKey` | A key a target's payloads are encrypted with. |
+| `ActionExecutionRequest` | Action targets to call when Zitadel handles a particular request, service, or all of them. |
+| `ActionExecutionResponse` | Action targets to call on a response Zitadel is about to return. |
+| `ActionExecutionEvent` | Action targets to call on a Zitadel event, or a group of them. |
+| `ActionExecutionFunction` | Action targets to call when another action calls a named function. |
+| `TriggerActions` | Actions to run at a point in a login flow, such as once a user has authenticated. |
+| `LockoutPolicy` … `DefaultSecuritySettings` | The seven organization policies, and the ten instance-wide policies they inherit from. |
 
 All managed resources are namespaced, in `zitadel.m.crossplane.io/v1alpha1`.
 `ProviderConfig` stays cluster wide in `zitadel.crossplane.io/v1alpha1`, so one
@@ -61,7 +70,12 @@ at when a manifest fails:
 * **Authorization** — `OrgMember`, `InstanceMember`, `UserGrant`,
   `ProjectGrant`, `ProjectGrantMember`. These attach roles to subjects; none of
   them creates a subject.
-* **Settings** — `UserMetadata`, `OrganizationMetadata`, `LoginPolicy`.
+* **Settings** — `UserMetadata`, `OrganizationMetadata`, `LoginPolicy`, and the
+  other sixteen policies: seven per organization and the instance-wide defaults
+  they inherit.
+* **Actions** — `Action`, `ActionTarget`, `ActionTargetPublicKey`, and the five
+  bindings that say when a target is called: four execution kinds plus
+  `TriggerActions`.
 
 ### Two kinds of role keys
 
@@ -532,34 +546,32 @@ Natural next steps, roughly in the order they tend to be needed:
 ### Coverage against the Terraform provider
 
 The official Zitadel Terraform provider registers **89** managed resources. This
-provider currently models **17** of them:
+provider currently models **42** of them, one for one:
 
 | | |
 |---|---|
-| Raw parity | 17 / 89 = **19%** |
-| Excluding localisation resources | 17 / 87 = **20%** |
+| Raw parity | 42 / 89 = **47%** |
+| Adjusted parity | 42 / 84 = **50%** |
 
-The two excluded resources (`default_hosted_login_translation`,
-`hosted_login_translation`) carry translated UI text rather than infrastructure,
-so a Crossplane managed resource is not a natural fit for them. Beyond that the
-gap is genuine work still to do, and it clusters into four groups:
+The adjusted figure drops five of the 89: two localisation resources
+(`default_hosted_login_translation`, `hosted_login_translation`), which carry
+translated UI text rather than infrastructure, and three deprecated aliases
+(`zitadel_org`, `zitadel_project_v2`, `zitadel_application_v2`) kept only for
+backwards compatibility and shadowed by kinds this provider models directly.
+
+What is left - 42 of the 84 worth modelling - clusters into three groups:
 
 * **Identity providers** — 23 resources (`idp_google`, `org_idp_ldap`, …). The
   largest single block, and repetitive: each provider is the same wiring with a
   different endpoint.
-* **Policies and settings** — 17 resources (`label_policy`, `lockout_policy`,
-  `password_complexity_policy`, `notification_policy`, …). `LoginPolicy` is the
-  first of this family; the rest follow the same singleton-per-scope shape.
-* **Instance level** — 8 resources (`instance_features`, `system_features`,
+* **Instance level** — 7 resources (`instance_features`, `system_features`,
   `instance_restrictions`, `instance_custom_domain`, `instance_trusted_domain`,
-  `instance_secret_generator`, `smtp_config`, `trigger_actions`). Note that
-  `instance_features` and `system_features` only toggle flags, so they have no
-  identity of their own to reconcile.
-* **Login customisation** — 7 `action` / `action_target` resources.
-* **The rest** — 15 resources: `application_saml`, `application_key`, the two
-  remaining `*_v2` aliases, `organization`, `domain`, `domain_policy`,
-  `organization_domain`, `org_metadata`, `project_member`, `webkey`,
-  `active_webkey`, and the four `email_provider_*` / `sms_provider_*` kinds.
+  `instance_secret_generator`, `smtp_config`). Note that `instance_features` and
+  `system_features` only toggle flags, so they have no identity of their own to
+  reconcile.
+* **The rest** — 11 resources: `application_saml`, `application_key`, `domain`,
+  `organization_domain`, `org_metadata`, `webkey`, `active_webkey`,
+  `project_member`, and the four `email_provider_*` and `sms_provider_*` kinds.
 
 Counts are reproducible from the Terraform provider's own resource registry:
 

@@ -1,0 +1,24 @@
+# A JavaScript snippet Zitadel runs at a point in a login flow.
+#
+# The script is sent to Zitadel as written and is never read back, so a change to
+# it is applied but never reported as drift. Everything else is compared.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: Action
+metadata:
+  name: platform-audit-log
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    organizationRef: {name: platform}
+    name: Audit log
+    # A small script that posts the event to an audit endpoint. Zitadel gives the
+    # action a `ctx` with the request or event that triggered it.
+    script: |
+      ctx.v0.logger.info("audit", { type: "audit" });
+    timeout: "10s"
+    # Carry on with the next action even when this one fails, so a broken audit
+    # endpoint cannot block a login.
+    allowedToFail: true
+    # Inactive keeps the script and its bindings but stops it running.
+    state: Active

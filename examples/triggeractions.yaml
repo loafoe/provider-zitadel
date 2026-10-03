@@ -1,0 +1,17 @@
+# Bind Actions to a point in a login flow.
+#
+# Deleting the resource clears the trigger rather than removing it, which is the
+# only thing Zitadel can do.
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: TriggerActions
+metadata:
+  name: after-login
+  namespace: zitadel
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    organizationRef: {name: platform}
+    flowType: InternalAuthentication
+    triggerType: PostAuthentication
+    # The Actions to run once a user has authenticated.
+    actionIDs: []

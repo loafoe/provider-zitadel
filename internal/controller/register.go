@@ -21,6 +21,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/loafoe/provider-zitadel/internal/controller/action"
+	"github.com/loafoe/provider-zitadel/internal/controller/actionexecution"
+	"github.com/loafoe/provider-zitadel/internal/controller/actiontarget"
+	"github.com/loafoe/provider-zitadel/internal/controller/actiontargetpublickey"
 	"github.com/loafoe/provider-zitadel/internal/controller/apiapplication"
 	"github.com/loafoe/provider-zitadel/internal/controller/config"
 	"github.com/loafoe/provider-zitadel/internal/controller/default_domain_policy"
@@ -54,6 +58,7 @@ import (
 	"github.com/loafoe/provider-zitadel/internal/controller/projectgrantmember"
 	"github.com/loafoe/provider-zitadel/internal/controller/projectrole"
 	"github.com/loafoe/provider-zitadel/internal/controller/serviceaccount"
+	"github.com/loafoe/provider-zitadel/internal/controller/triggeractions"
 	"github.com/loafoe/provider-zitadel/internal/controller/usergrant"
 	"github.com/loafoe/provider-zitadel/internal/controller/usermetadata"
 )
@@ -101,6 +106,13 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		privacy_policy.Setup,
 		domain_policy.Setup,
 		label_policy.Setup,
+
+		// Actions and the things they are called at.
+		action.Setup,
+		actiontarget.Setup,
+		actiontargetpublickey.Setup,
+		actionexecution.Setup,
+		triggeractions.Setup,
 
 		// The policies an organization inherits until it sets its own. These
 		// cannot be reset, so deleting one restores what it overwrote.
