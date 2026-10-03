@@ -117,6 +117,74 @@ spec:
 }
 
 
+# The three domain lists.
+EXAMPLES["InstanceCustomDomain"] = (
+    "Zitadel instance custom domain",
+    "instance_custom_domain.yaml",
+    """apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: InstanceCustomDomain
+metadata:
+  name: zitadel-login-domain
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    # The domain Zitadel answers on. Zitadel also answers on one domain it
+    # generated for itself, which is not managed here: it made that one, and it
+    # will not remove it.
+    domain: login.example.com
+""",
+)
+
+EXAMPLES["InstanceTrustedDomain"] = (
+    "Zitadel instance trusted domain",
+    "instance_trusted_domain.yaml",
+    """apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: InstanceTrustedDomain
+metadata:
+  name: zitadel-trusted-domain
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    # The domain allowed to ask this Zitadel instance for one of its tokens,
+    # which is how an application outside the instance authenticates a user
+    # against it.
+    domain: apps.example.com
+""",
+)
+
+EXAMPLES["OrganizationDomain"] = (
+    "Zitadel organization domain",
+    "organization_domain.yaml",
+    """apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: OrganizationDomain
+metadata:
+  name: platform-domain
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    organizationRef:
+      name: platform
+    # The domain the organization owns. Zitadel adds it unverified.
+    domain: example.com
+    # DNS asks for a TXT record, HTTP for a file at a URL Zitadel gives.
+    validationType: DOMAIN_VALIDATION_TYPE_DNS
+    # Asking Zitadel to check is only half of it: the token and URL it reports in
+    # the status have to be published first, and the domain becomes verified once
+    # Zitadel sees them.
+    verify: true
+""",
+)
+
+
 if __name__ == "__main__":
     out_dir = sys.argv[1]
     for kind, (title, filename, body) in EXAMPLES.items():

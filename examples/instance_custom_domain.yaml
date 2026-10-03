@@ -1,0 +1,24 @@
+# An example of a Zitadel instance custom domain.
+#
+# Apply it with:
+#
+#     kubectl apply -f instance_custom_domain.yaml
+#
+# This manages state that belongs to the whole Zitadel instance, so two of these
+# in different namespaces would be asking for the same settings and the second
+# would win. Only one at a time.
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: InstanceCustomDomain
+metadata:
+  name: zitadel-login-domain
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    # The domain Zitadel answers on. Zitadel also answers on one domain it
+    # generated for itself, which is not managed here: it made that one, and it
+    # will not remove it.
+    domain: login.example.com

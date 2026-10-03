@@ -41,6 +41,8 @@ import (
 	"github.com/zitadel/zitadel-go/v3/pkg/client/zitadel"
 	actionapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/action/v2"
 	featureapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/feature/v2"
+	instanceapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/instance/v2"
+	orgv2api "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/org/v2"
 	settingsapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/settings/v2"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
@@ -119,6 +121,16 @@ type Client struct {
 	// which are the only Zitadel surface that reads or writes them.
 	feature     featureapi.FeatureServiceClient
 	featureConn *zitadel.Connection
+
+	// The v2 instance service holds the custom and trusted domain lists.
+	instance     instanceapi.InstanceServiceClient
+	instanceConn *zitadel.Connection
+
+	// The v2beta organization service holds the domains an organization owns.
+	// It is on a different service from the v2 organization client above, and is
+	// the only surface that can add, list and remove one.
+	orgDomain     orgv2api.OrganizationServiceClient
+	orgDomainConn *zitadel.Connection
 
 	// The v1 admin API is the only API that manages instance memberships (IAM
 	// roles), instance settings and the domain policy. Most of it is instance
@@ -295,22 +307,40 @@ func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 
 	ft := featureapi.NewFeatureServiceClient(ftConn.ClientConn)
 
+	// So are the instance and v2beta organization services, which the domain
+	// lists live on.
+	instConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
+	if err != nil {
+		closeAll()
+		return nil, fmt.Errorf("cannot create zitadel instance connection: %w", err)
+	}
+
+	orgDomConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
+	if err != nil {
+		closeAll()
+		return nil, fmt.Errorf("cannot create zitadel organization domain connection: %w", err)
+	}
+
 	return &Client{
-		user:         u,
-		project:      p,
-		application:  a,
-		org:          o,
-		admin:        ad,
-		action:       act,
-		actionConn:   actConn,
-		feature:      ft,
-		featureConn:  ftConn,
-		settings:     st,
-		settingsConn: stConn,
-		issuer:       issuer,
-		api:          api,
-		options:      opts,
-		management:   map[string]*management.Client{},
+		user:          u,
+		project:       p,
+		application:   a,
+		org:           o,
+		admin:         ad,
+		action:        act,
+		actionConn:    actConn,
+		feature:       ft,
+		featureConn:   ftConn,
+		settings:      st,
+		settingsConn:  stConn,
+		instance:      instanceapi.NewInstanceServiceClient(instConn.ClientConn),
+		instanceConn:  instConn,
+		orgDomain:     orgv2api.NewOrganizationServiceClient(orgDomConn.ClientConn),
+		orgDomainConn: orgDomConn,
+		issuer:        issuer,
+		api:           api,
+		options:       opts,
+		management:    map[string]*management.Client{},
 	}, nil
 }
 
@@ -354,7 +384,7 @@ func connectionOptions(ctx context.Context, cfg Config, issuer, api string) []zi
 func (c *Client) Close() error {
 	var errs []error
 
-	for _, conn := range []interface{ Close() error }{c.user.Connection, c.project.Connection, c.application.Connection, c.org.Connection, c.admin.Connection, c.settingsConn, c.actionConn, c.featureConn} {
+	for _, conn := range []interface{ Close() error }{c.user.Connection, c.project.Connection, c.application.Connection, c.org.Connection, c.admin.Connection, c.settingsConn, c.actionConn, c.featureConn, c.instanceConn, c.orgDomainConn} {
 		if conn == nil {
 			continue
 		}

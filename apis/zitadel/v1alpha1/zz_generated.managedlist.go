@@ -287,6 +287,15 @@ func (l *IDPSAMLList) GetItems() []resource.Managed {
 	return items
 }
 
+// GetItems of this InstanceCustomDomainList.
+func (l *InstanceCustomDomainList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
 // GetItems of this InstanceFeaturesList.
 func (l *InstanceFeaturesList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
@@ -316,6 +325,15 @@ func (l *InstanceRestrictionsList) GetItems() []resource.Managed {
 
 // GetItems of this InstanceSecretGeneratorList.
 func (l *InstanceSecretGeneratorList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this InstanceTrustedDomainList.
+func (l *InstanceTrustedDomainList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]
@@ -487,6 +505,15 @@ func (l *OrgIDPSAMLList) GetItems() []resource.Managed {
 
 // GetItems of this OrgMemberList.
 func (l *OrgMemberList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this OrganizationDomainList.
+func (l *OrganizationDomainList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]

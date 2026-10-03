@@ -314,8 +314,217 @@ def render(s):
     return "\n".join(out)
 
 
+# One named thing in a list of domains.
+#
+# A custom or trusted domain belongs to the instance and needs no reference; an
+# organization domain belongs to an organization and needs one.
+DOMAINS = [
+    {
+        "kind": "InstanceCustomDomain",
+        "title": "Zitadel instance custom domain",
+        "purpose": "make this Zitadel instance answer on a domain of its own",
+        "fields": [],
+        "required": ["Domain"],
+        "example": [("domain", '"login.example.com"')],
+        "observed": [
+            ("Domain", "string"),
+            ("IsPrimary", "bool"),
+        ],
+        "notes": """
+        // The domain this instance answers on. Zitadel answers on one generated
+        // domain of its own as well, which is not managed here: it is the one
+        // Zitadel made, and removing it is not possible.
+""",
+    },
+    {
+        "kind": "InstanceTrustedDomain",
+        "title": "Zitadel instance trusted domain",
+        "purpose": "let a domain of your own request a token from this instance",
+        "fields": [],
+        "required": ["Domain"],
+        "example": [("domain", '"apps.example.com"')],
+        "observed": [("Domain", "string")],
+        "notes": """
+        // The domain allowed to ask this Zitadel instance for one of its tokens,
+        // which is how an application outside the instance authenticates a user
+        // against it.
+""",
+    },
+    {
+        "kind": "OrganizationDomain",
+        "title": "Zitadel organization domain",
+        "purpose": "let an organization own a domain and sign users in with it",
+        "fields": [
+            ("ValidationType", "validationType", STR,
+             "How the domain is proved to belong to the organization: "
+             "`DOMAIN_VALIDATION_TYPE_DNS` or `DOMAIN_VALIDATION_TYPE_HTTP`. "
+             "`DNS` asks for a TXT record, `HTTP` for a file at a URL Zitadel "
+             "gives. Only asked for when `verify` is set."),
+            ("Verify", "verify", BOOL,
+             "Ask Zitadel to check that the organization has proved it owns the "
+             "domain. Proving it is something the organization does afterwards, "
+             "so this only starts the check: the token or URL it reports is in "
+             "the status, and the domain becomes verified once Zitadel sees the "
+             "proof."),
+        ],
+        "required": ["Domain"],
+        "organization": True,
+        "example": [
+            ("domain", '"example.com"'),
+            ("validationType", "DOMAIN_VALIDATION_TYPE_DNS"),
+            ("verify", "true"),
+        ],
+        "observed": [
+            ("Domain", "string"),
+            ("IsVerified", "bool"),
+            ("IsPrimary", "bool"),
+            ("ValidationType", "string"),
+            ("ValidationToken", "string"),
+            ("ValidationURL", "string"),
+        ],
+        "notes": """
+        // The domain the organization owns. Zitadel adds it unverified; it
+        // becomes verified once the organization has proved it owns the domain,
+        // which `verify` starts but does not finish.
+""",
+    },
+]
+
+
+def render_domain(d):
+    kind = d["kind"]
+
+    out = [LICENSE, ""]
+    out.append("package v1alpha1\n")
+    out.append("import (")
+    out.append('\t"reflect"\n')
+    out.append('\txpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"')
+    out.append('\txpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"')
+    out.append('\tmetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"')
+    out.append('\t"k8s.io/apimachinery/pkg/runtime/schema"\n)\n')
+
+    out.append("// %sSpec defines the desired state of a %s." % (kind, kind))
+    out.append("type %sSpec struct {" % kind)
+    out.append('\txpv2.ManagedResourceSpec `json:",inline"`')
+    out.append('\tForProvider %sParameters `json:"forProvider"`' % kind)
+    out.append("}\n")
+
+    out.append("// %sParameters is the desired configuration of a %s." % (kind, d["title"]))
+    out.append("type %sParameters struct {" % kind)
+    if d.get("organization"):
+        out.append("\t// OrganizationID is the ID of the organization the domain belongs to.")
+        out.append("\t// Either `organizationID`, `organizationRef` or `organizationSelector`")
+        out.append("\t// must be set.")
+        out.append("\t//")
+        out.append("\t// +optional")
+        out.append('\tOrganizationID *string `json:"organizationID,omitempty"`\n')
+        out.append("\t// OrganizationRef references an Organization managed by this provider and")
+        out.append("\t// uses its ID.")
+        out.append("\t//")
+        out.append("\t// +optional")
+        out.append('\tOrganizationRef *xpv1.Reference `json:"organizationRef,omitempty"`\n')
+        out.append("\t// OrganizationSelector selects an Organization managed by this provider and")
+        out.append("\t// uses its ID.")
+        out.append("\t//")
+        out.append("\t// +optional")
+        out.append('\tOrganizationSelector *xpv1.Selector `json:"organizationSelector,omitempty"`\n')
+
+    out.append(d["notes"].strip("\n"))
+    out.append("\t//")
+    out.append("\t// It is required: it is what the entry is called, and therefore what")
+    out.append("\t// identifies it in Zitadel.")
+    out.append('\tDomain *string `json:"domain"`\n')
+
+    for name, json_name, go_type, doc in d["fields"]:
+        out.append("\t// %s controls the following. %s" % (name, doc.rstrip(".")))
+        out.append("\t//")
+        out.append("\t// +optional")
+        out.append('\t%s %s `json:"%s,omitempty"`' % (name, go_type, json_name))
+    out.append("}\n")
+
+    out.append("// %sObservation is what Zitadel reports about a %s." % (kind, d["title"]))
+    out.append("type %sObservation struct {" % kind)
+    for name, go_type in d["observed"]:
+        out.append('\t%s %s `json:"%s,omitempty"`' % (name, go_type, name[:1].lower() + name[1:]))
+    out.append("}\n")
+
+    out.append("// %sStatus reports the observed state of a %s." % (kind, d["title"]))
+    out.append("type %sStatus struct {" % kind)
+    out.append('\txpv1.ResourceStatus `json:",inline"`\n')
+    out.append("\t// AtProvider is the observed state.")
+    out.append('\tAtProvider %sObservation `json:"atProvider,omitempty"`\n' % kind)
+    out.append("\t// Scope is the owner the entry was last seen in, recorded so that a")
+    out.append("\t// terminating resource removes it from where it actually put it.")
+    out.append('\tScope string `json:"scope,omitempty"`')
+    out.append("}\n")
+
+    out.append("// +kubebuilder:object:root=true")
+    out.append("// +kubebuilder:subresource:status")
+    out.append("// +kubebuilder:resource:scope=Namespaced,categories={zitadel}")
+    out.append("// +kubebuilder:printcolumn:name=\"READY\",type=\"string\",JSONPath=\".status.conditions[?(@.type=='Ready')].status\"")
+    out.append("// +kubebuilder:printcolumn:name=\"SYNCED\",type=\"string\",JSONPath=\".status.conditions[?(@.type=='Synced')].status\"")
+    out.append("// +kubebuilder:printcolumn:name=\"DOMAIN\",type=\"string\",JSONPath=\".spec.forProvider.domain\"")
+    out.append("// +kubebuilder:printcolumn:name=\"AGE\",type=\"date\",JSONPath=\".metadata.creationTimestamp\"")
+    out.append("")
+    out.append("// %s is a managed resource that %s." % (kind, d["purpose"]))
+    out.append("//")
+    out.append("// A domain is a name in a list and nothing more: there is no identifier to")
+    out.append("// look up, nothing to compare once it is present, and nothing to restore.")
+    out.append("// Changing the name therefore leaves the old entry behind, because removing")
+    out.append("// something another resource may also be managing is not this resource's call.")
+    out.append("// +kubebuilder:object:generate=true")
+    out.append("type %s struct {" % kind)
+    out.append('\tmetav1.TypeMeta   `json:",inline"`')
+    out.append('\tmetav1.ObjectMeta `json:"metadata,omitempty"`\n')
+    out.append('\tSpec   %sSpec   `json:"spec"`' % kind)
+    out.append('\tStatus %sStatus `json:"status,omitempty"`' % kind)
+    out.append("}\n")
+
+    out.append("// +kubebuilder:object:root=true")
+    out.append("")
+    out.append("// %sList contains a list of %s." % (kind, kind))
+    out.append("type %sList struct {" % kind)
+    out.append('\tmetav1.TypeMeta `json:",inline"`')
+    out.append('\tmetav1.ListMeta `json:"metadata,omitempty"`')
+    out.append('\tItems           []%s `json:"items"`' % kind)
+    out.append("}\n")
+
+    out.append("// %s type metadata." % kind)
+    out.append("var (")
+    out.append("\t%sKind             = reflect.TypeOf(%s{}).Name()" % (kind, kind))
+    out.append("\t%sGroupKind        = schema.GroupKind{Group: Group, Kind: %sKind}.String()" % (kind, kind))
+    out.append("\t%sKindAPIVersion   = %sKind + \".\" + SchemeGroupVersion.String()" % (kind, kind))
+    out.append("\t%sGroupVersionKind = SchemeGroupVersion.WithKind(%sKind)" % (kind, kind))
+    out.append(")")
+    out.append("")
+    out.append("func init() {")
+    out.append("\tSchemeBuilder.Register(&%s{}, &%sList{})" % (kind, kind))
+    out.append("}\n")
+
+    out.append(NAMED_ACCESSORS.replace("KIND", kind))
+    return "\n".join(out)
+
+
+NAMED_ACCESSORS = """
+// NamedName returns the name the entry should have, which is also its identity.
+func (mg *KIND) NamedName() string { return Deref(mg.Spec.ForProvider.Domain) }
+
+// NamedSetScope records the owner the entry was last seen in.
+func (mg *KIND) NamedSetScope(scope string) { mg.Status.Scope = scope }
+
+// NamedScope returns the recorded owner.
+func (mg *KIND) NamedScope() string { return mg.Status.Scope }
+"""
+
+
 if __name__ == "__main__":
     out_dir = sys.argv[1]
+    for d in DOMAINS:
+        path = "%s/%s_types.go" % (out_dir, snake_case(d["kind"]))
+        with open(path, "w") as f:
+            f.write(render_domain(d))
+        print("wrote", path)
+
     for s in SETTINGS:
         path = "%s/%s_types.go" % (out_dir, snake_case(s["kind"]))
         with open(path, "w") as f:

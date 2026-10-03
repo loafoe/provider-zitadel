@@ -1,0 +1,30 @@
+# An example of a Zitadel organization domain.
+#
+# Apply it with:
+#
+#     kubectl apply -f organization_domain.yaml
+#
+# This manages state that belongs to the whole Zitadel instance, so two of these
+# in different namespaces would be asking for the same settings and the second
+# would win. Only one at a time.
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: OrganizationDomain
+metadata:
+  name: platform-domain
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    organizationRef:
+      name: platform
+    # The domain the organization owns. Zitadel adds it unverified.
+    domain: example.com
+    # DNS asks for a TXT record, HTTP for a file at a URL Zitadel gives.
+    validationType: DOMAIN_VALIDATION_TYPE_DNS
+    # Asking Zitadel to check is only half of it: the token and URL it reports in
+    # the status have to be published first, and the domain becomes verified once
+    # Zitadel sees them.
+    verify: true

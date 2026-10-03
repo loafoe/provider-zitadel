@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	feature "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/feature/v2"
+	orgv2 "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/org/v2"
 	settings "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/settings"
 
 	"github.com/google/go-cmp/cmp"
@@ -405,6 +406,37 @@ func TestEnumNamesAreReadRatherThanStringified(t *testing.T) {
 		}
 		if got != tc.want {
 			t.Errorf("the improved performance value %d read as %q, want %q", tc.got, got, tc.want)
+		}
+	}
+}
+
+// Zitadel sends enumerations as numbers, so converting one straight to a string
+// yields the character with that code point rather than its name.
+//
+// It bit twice: first on the feature flags and the secret generator types, then
+// again on a domain's validation type, where the unspecified value of 0 put a
+// NUL character in the status. Every conversion is pinned here so the third
+// does not happen either.
+func TestEnumsAreReadThroughTheirNameMaps(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		got   int32
+		known bool
+	}{
+		{"the unspecified validation type", 0, true},
+		{"http validation", 1, true},
+		{"dns validation", 2, true},
+		{"a validation type Zitadel does not have", 99, false},
+	} {
+		got, ok := orgv2.DomainValidationType_name[tc.got]
+		if ok != tc.known {
+			t.Errorf("%s: the name map knows %d as %t, want %t", tc.name, tc.got, ok, tc.known)
+			continue
+		}
+
+		if ok && got == string(tc.got) {
+			t.Errorf("%s: %d read as %q, which is the code point rather than the name",
+				tc.name, tc.got, got)
 		}
 	}
 }

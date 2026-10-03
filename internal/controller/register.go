@@ -38,6 +38,7 @@ import (
 	"github.com/loafoe/provider-zitadel/internal/controller/default_privacy_policy"
 	"github.com/loafoe/provider-zitadel/internal/controller/default_security_settings"
 	"github.com/loafoe/provider-zitadel/internal/controller/domain_policy"
+	"github.com/loafoe/provider-zitadel/internal/controller/domains"
 	"github.com/loafoe/provider-zitadel/internal/controller/humanuser"
 	"github.com/loafoe/provider-zitadel/internal/controller/idp"
 	"github.com/loafoe/provider-zitadel/internal/controller/instancemember"
@@ -133,6 +134,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		default_oidc_settings.Setup,
 		default_security_settings.Setup,
 		instancesettings.Setup,
+		domains.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err

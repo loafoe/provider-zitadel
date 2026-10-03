@@ -1,0 +1,24 @@
+# An example of a Zitadel instance trusted domain.
+#
+# Apply it with:
+#
+#     kubectl apply -f instance_trusted_domain.yaml
+#
+# This manages state that belongs to the whole Zitadel instance, so two of these
+# in different namespaces would be asking for the same settings and the second
+# would win. Only one at a time.
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: InstanceTrustedDomain
+metadata:
+  name: zitadel-trusted-domain
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    # The domain allowed to ask this Zitadel instance for one of its tokens,
+    # which is how an application outside the instance authenticates a user
+    # against it.
+    domain: apps.example.com
