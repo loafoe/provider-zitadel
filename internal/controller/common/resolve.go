@@ -485,6 +485,49 @@ func EnumValues[T ~string](values []string) []T {
 	return out
 }
 
+// ResolveWebKeyID resolves a reference that must point at a WebKey.
+//
+// A WebKey is an instance wide object and its identifier is the external name it
+// was created with, which is what the reference is resolved against.
+func ResolveWebKeyID(ctx context.Context, kube client.Client, mg resource.ModernManaged,
+	ref *xpv1.Reference, selector *xpv1.Selector, direct *string,
+) (string, error) {
+	if ref == nil && selector == nil {
+		if direct == nil {
+			return "", errors.Join(ErrNoWebKeyID, errors.New("either webKeyID, webKeyRef or webKeySelector must be set"))
+		}
+
+		return *direct, nil
+	}
+
+	rsp, err := reference.NewAPIResolver(kube, mg).Resolve(ctx, reference.ResolutionRequest{
+		Reference: ref,
+		Selector:  selector,
+		To: reference.To{
+			Managed: &v1alpha1.WebKey{},
+			List:    &v1alpha1.WebKeyList{},
+		},
+		Extract: func(m resource.Managed) string {
+			k, ok := m.(*v1alpha1.WebKey)
+			if !ok {
+				return ""
+			}
+
+			return k.Status.AtProvider.ID
+		},
+		Namespace: mg.GetNamespace(),
+	})
+	if err != nil {
+		return "", errors.Join(ErrNoWebKeyID, err)
+	}
+
+	if rsp.ResolvedValue == "" {
+		return "", errors.Join(ErrNoWebKeyID, errors.New("the referenced WebKey has not been created yet, so it has no identifier to activate"))
+	}
+
+	return rsp.ResolvedValue, nil
+}
+
 // ResolveApplicationID resolves a reference that must point at an OIDCApplication
 // or an ApplicationAPI.
 //

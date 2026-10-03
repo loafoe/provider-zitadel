@@ -153,9 +153,10 @@ func (e *webKeyExternal) Create(ctx context.Context, mg resource.Managed) (manag
 
 	fp := cr.Spec.ForProvider
 	id, err := e.client.CreateWebKey(ctx, zitadel.WebKeyAlgorithm{
-		Type:      common.Deref(fp.Algorithm),
-		RSABits:   common.Deref(fp.RSABits),
-		RSAHasher: common.Deref(fp.RSAHasher),
+		Type:       common.Deref(fp.Algorithm),
+		RSABits:    common.Deref(fp.RSABits),
+		RSAHasher:  common.Deref(fp.RSAHasher),
+		ECDSACurve: common.Deref(fp.ECDSACurve),
 	})
 	if err != nil {
 		return managed.ExternalCreation{}, err

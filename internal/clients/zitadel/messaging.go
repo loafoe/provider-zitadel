@@ -192,12 +192,16 @@ type MessageProvider struct {
 	Description string
 
 	// The fields below are what each kind carries, and are empty for the rest.
-	SenderAddress    string
-	SenderName       string
-	ReplyToAddress   string
-	Host             string
-	User             string
-	TLS              bool
+	SenderAddress  string
+	SenderName     string
+	ReplyToAddress string
+	Host           string
+	User           string
+	TLS            bool
+
+	// TLSSet reports whether the manifest said anything about TLS at all. A
+	// provider written without it must not be read as one that wants it off.
+	TLSSet           bool
 	Endpoint         string
 	SID              string
 	SenderNumber     string
@@ -221,15 +225,9 @@ func (c *Client) ListEmailProviders(ctx context.Context) ([]MessageProvider, err
 
 	out := make([]MessageProvider, 0, len(resp.GetResult()))
 	for _, p := range resp.GetResult() {
-		// The state is an enumeration sent as a number.
-		state, known := settings.EmailProviderState_name[int32(p.GetState())]
-		if !known {
-			return nil, fmt.Errorf("zitadel reported the unknown email provider state %d", int32(p.GetState()))
-		}
-
 		m := MessageProvider{
 			ID:          p.GetId(),
-			State:       state,
+			State:       emailProviderState(p.GetState()),
 			Description: p.GetDescription(),
 		}
 
@@ -265,15 +263,9 @@ func (c *Client) ListSMSProviders(ctx context.Context) ([]MessageProvider, error
 
 	out := make([]MessageProvider, 0, len(resp.GetResult()))
 	for _, p := range resp.GetResult() {
-		// The state is an enumeration sent as a number.
-		state, known := settings.SMSProviderConfigState_name[int32(p.GetState())]
-		if !known {
-			return nil, fmt.Errorf("zitadel reported the unknown sms provider state %d", int32(p.GetState()))
-		}
-
 		m := MessageProvider{
 			ID:          p.GetId(),
-			State:       state,
+			State:       smsProviderState(p.GetState()),
 			Description: p.GetDescription(),
 		}
 
@@ -461,19 +453,84 @@ func (c *Client) RemoveSMSProvider(ctx context.Context, id string) error {
 	return err
 }
 
+// The two spellings a provider state arrives in: what a manifest says, and what
+// Zitadel's enumeration calls it. They are translated rather than made the
+// manifest's problem, so a spec and a status can say the same word.
+const (
+	stateActive   = "Active"
+	stateInactive = "Inactive"
+)
+
+// emailProviderState is Zitadel's email provider state in the spelling a
+// manifest uses.
+//
+// Zitadel's enumeration is spelled EMAIL_PROVIDER_ACTIVE; the two spellings are
+// translated here so that a manifest and a status can say the same word.
+func emailProviderState(s settings.EmailProviderState) string {
+	switch s {
+	case settings.EmailProviderState_EMAIL_PROVIDER_ACTIVE:
+		return stateActive
+	case settings.EmailProviderState_EMAIL_PROVIDER_INACTIVE:
+		return stateInactive
+	case settings.EmailProviderState_EMAIL_PROVIDER_STATE_UNSPECIFIED:
+		// Zitadel saying nothing, rather than a third state.
+		return ""
+	default:
+		return ""
+	}
+}
+
+// smsProviderState is smsProviderState for an SMS provider.
+func smsProviderState(s settings.SMSProviderConfigState) string {
+	switch s {
+	case settings.SMSProviderConfigState_SMS_PROVIDER_CONFIG_ACTIVE:
+		return stateActive
+	case settings.SMSProviderConfigState_SMS_PROVIDER_CONFIG_INACTIVE:
+		return stateInactive
+	case settings.SMSProviderConfigState_SMS_PROVIDER_CONFIG_STATE_UNSPECIFIED:
+		// As above: Zitadel saying nothing.
+		return ""
+	default:
+		return ""
+	}
+}
+
+// emailProviderEnum is emailProviderState read the other way.
+func emailProviderEnum(state string) (settings.EmailProviderState, bool) {
+	switch state {
+	case stateActive, "EMAIL_PROVIDER_ACTIVE":
+		return settings.EmailProviderState_EMAIL_PROVIDER_ACTIVE, true
+	case stateInactive, "EMAIL_PROVIDER_INACTIVE":
+		return settings.EmailProviderState_EMAIL_PROVIDER_INACTIVE, true
+	default:
+		return 0, false
+	}
+}
+
+// smsProviderEnum is emailProviderEnum for an SMS provider.
+func smsProviderEnum(state string) (settings.SMSProviderConfigState, bool) {
+	switch state {
+	case stateActive, "SMS_PROVIDER_CONFIG_ACTIVE":
+		return settings.SMSProviderConfigState_SMS_PROVIDER_CONFIG_ACTIVE, true
+	case stateInactive, "SMS_PROVIDER_CONFIG_INACTIVE":
+		return settings.SMSProviderConfigState_SMS_PROVIDER_CONFIG_INACTIVE, true
+	default:
+		return 0, false
+	}
+}
+
 // SetEmailProviderState activates or deactivates an email provider.
 //
 // Zitadel only ever sends through an active one, and refuses to deactivate the
 // last one it has, so activation is a call of its own rather than part of an
 // update.
 func (c *Client) SetEmailProviderState(ctx context.Context, id, state string) error {
-	active, known := settings.EmailProviderState_value[state]
+	wanted, known := emailProviderEnum(state)
 	if !known {
-		return fmt.Errorf("zitadel has no email provider state %q: it must be one of %v",
-			state, settings.EmailProviderState_name)
+		return fmt.Errorf("zitadel has no email provider state %q: it must be %s or %s", state, stateActive, stateInactive)
 	}
 
-	switch settings.EmailProviderState(active) {
+	switch wanted {
 	case settings.EmailProviderState_EMAIL_PROVIDER_ACTIVE:
 		_, err := c.admin.ActivateEmailProvider(ctx, &admin.ActivateEmailProviderRequest{Id: id}) //nolint:staticcheck // the admin API is the only surface that carries the providers
 		return err
@@ -482,7 +539,7 @@ func (c *Client) SetEmailProviderState(ctx context.Context, id, state string) er
 		// The unspecified state is Zitadel saying nothing, which is left alone
 		// rather than guessed at: it would activate or deactivate on a guess.
 		settings.EmailProviderState_EMAIL_PROVIDER_STATE_UNSPECIFIED:
-		if active == int32(settings.EmailProviderState_EMAIL_PROVIDER_STATE_UNSPECIFIED) {
+		if wanted == settings.EmailProviderState_EMAIL_PROVIDER_STATE_UNSPECIFIED {
 			return nil
 		}
 
@@ -496,13 +553,12 @@ func (c *Client) SetEmailProviderState(ctx context.Context, id, state string) er
 
 // SetSMSProviderState activates or deactivates an SMS provider.
 func (c *Client) SetSMSProviderState(ctx context.Context, id, state string) error {
-	active, known := settings.SMSProviderConfigState_value[state]
+	wanted, known := smsProviderEnum(state)
 	if !known {
-		return fmt.Errorf("zitadel has no sms provider state %q: it must be one of %v",
-			state, settings.SMSProviderConfigState_name)
+		return fmt.Errorf("zitadel has no sms provider state %q: it must be %s or %s", state, stateActive, stateInactive)
 	}
 
-	switch settings.SMSProviderConfigState(active) {
+	switch wanted {
 	case settings.SMSProviderConfigState_SMS_PROVIDER_CONFIG_ACTIVE:
 		_, err := c.admin.ActivateSMSProvider(ctx, &admin.ActivateSMSProviderRequest{Id: id}) //nolint:staticcheck // the admin API is the only surface that carries the providers
 		return err
@@ -510,7 +566,7 @@ func (c *Client) SetSMSProviderState(ctx context.Context, id, state string) erro
 	case settings.SMSProviderConfigState_SMS_PROVIDER_CONFIG_INACTIVE,
 		// As above: the unspecified state is Zitadel saying nothing.
 		settings.SMSProviderConfigState_SMS_PROVIDER_CONFIG_STATE_UNSPECIFIED:
-		if active == int32(settings.SMSProviderConfigState_SMS_PROVIDER_CONFIG_STATE_UNSPECIFIED) {
+		if wanted == settings.SMSProviderConfigState_SMS_PROVIDER_CONFIG_STATE_UNSPECIFIED {
 			return nil
 		}
 

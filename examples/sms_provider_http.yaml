@@ -1,0 +1,20 @@
+# An example of a Zitadel HTTP SMS provider.
+#
+# Apply it with:
+#
+#     kubectl apply -f sms_provider_http.yaml
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: SMSProviderHTTP
+metadata:
+  name: zitadel-sms-http
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    # Receives the same payload Zitadel would hand an SMS gateway, so the
+    # endpoint has to understand it.
+    endpoint: "https://sms.example.com/send"
+    description: "The instance wide SMS provider"

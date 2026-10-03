@@ -109,6 +109,11 @@ KIND = {
          "The signing algorithm for an RSA key: `RSA_HASHER_SHA256`, "
          "`RSA_HASHER_SHA384` or `RSA_HASHER_SHA512`. Zitadel's default is "
          "SHA256. Ignored for the other algorithms."),
+        ("ECDSACurve", "ecdsaCurve", STR,
+         "The curve for an ECDSA key: `ECDSA_CURVE_P256`, `ECDSA_CURVE_P384` or "
+         "`ECDSA_CURVE_P512`. Zitadel documents P-256 as the default but rejects "
+         "an unset curve rather than choosing one, so an empty field means "
+         "P-256. Ignored for the other algorithms."),
     ],
     "ApplicationKey": [
         ("ExpirationDate", "expirationDate", STR,

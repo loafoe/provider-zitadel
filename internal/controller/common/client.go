@@ -81,6 +81,10 @@ var (
 	// ErrNoApplicationID is returned when the application a resource belongs to
 	// cannot be determined.
 	ErrNoApplicationID = errors.New("cannot determine the application of the resource")
+
+	// ErrNoWebKeyID is returned when the signing key a resource points at cannot
+	// be determined.
+	ErrNoWebKeyID = errors.New("cannot determine the signing key of the resource")
 )
 
 // NewClientFromProviderConfig reads the ProviderConfig referenced by mg from

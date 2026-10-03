@@ -374,6 +374,20 @@ func (c *Client) GenerateClientSecret(ctx context.Context, applicationID string)
 }
 
 // DeleteOIDCApplication removes an application.
+// DeleteApplication removes an application of any type.
+//
+// Zitadel addresses the delete by project and application, so a caller that has
+// resolved a project passes it in. An empty project is left to Zitadel, which
+// resolves the application by its identifier alone where it can.
+func (c *Client) DeleteApplication(ctx context.Context, applicationID, projectID string) error {
+	_, err := c.application.DeleteApplication(ctx, &apiv2.DeleteApplicationRequest{
+		ApplicationId: applicationID,
+		ProjectId:     projectID,
+	})
+
+	return err
+}
+
 func (c *Client) DeleteOIDCApplication(ctx context.Context, applicationID, projectID string) error {
 	// Zitadel validates both fields, so the project is not optional even though
 	// the application identifies itself.

@@ -46,6 +46,10 @@ type WebKeyParameters struct {
 	//
 	// +optional
 	RSAHasher *string `json:"rsaHasher,omitempty"`
+	// ECDSACurve controls the following. The curve for an ECDSA key: `ECDSA_CURVE_P256`, `ECDSA_CURVE_P384` or `ECDSA_CURVE_P512`. Zitadel documents P-256 as the default but rejects an unset curve rather than choosing one, so an empty field means P-256. Ignored for the other algorithms
+	//
+	// +optional
+	ECDSACurve *string `json:"ecdsaCurve,omitempty"`
 }
 
 // WebKeyObservation is what Zitadel reports about a signing key.

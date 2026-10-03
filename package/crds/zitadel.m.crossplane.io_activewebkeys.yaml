@@ -4,16 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
-  name: webkeys.zitadel.m.crossplane.io
+  name: activewebkeys.zitadel.m.crossplane.io
 spec:
   group: zitadel.m.crossplane.io
   names:
     categories:
     - zitadel
-    kind: WebKey
-    listKind: WebKeyList
-    plural: webkeys
-    singular: webkey
+    kind: ActiveWebKey
+    listKind: ActiveWebKeyList
+    plural: activewebkeys
+    singular: activewebkey
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -30,18 +30,15 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          WebKey is a managed resource that hold one of Zitadel's own signing keys.
+          ActiveWebKey is a managed resource that point at the signing key Zitadel signs tokens with.
 
-          Zitadel signs its tokens with one of these, and an application verifies
-          them with the active one. The private half never leaves Zitadel, so a key
-          this provider manages is an identity and a state and nothing more:
+          Zitadel signs its tokens with one of its keys, and this is what decides
+          which. There is only ever one active key: activating another makes this
+          stale and the former one inactive, so two of these in different namespaces
+          would be fighting over the same setting.
 
-            - Zitadel creates it inactive, so it verifies nothing until activated.
-              ActivatedWebKey is what does that.
-            - The key type cannot be changed, only replaced, so changing the algorithm
-              is reported as needing a new key rather than silently ignored.
-            - Zitadel refuses to remove the active key, so it has to be activated
-              away first.
+          Zitadel will not remove a key that is active, so a key this resource
+          points at has to be activated away before it can be deleted.
         properties:
           apiVersion:
             description: |-
@@ -61,35 +58,93 @@ spec:
           metadata:
             type: object
           spec:
-            description: WebKeySpec defines the desired state of a WebKey.
+            description: ActiveWebKeySpec defines the desired state of a ActiveWebKey.
             properties:
               forProvider:
-                description: WebKeyParameters is the desired configuration of a hold
-                  one of Zitadel's own signing keys.
+                description: ActiveWebKeyParameters is the desired configuration of
+                  a Zitadel active signing key.
                 properties:
-                  algorithm:
-                    description: Algorithm controls the following. `rsa`, `ecdsa`
-                      or `ed25519`. Zitadel generates the key; the private half never
-                      leaves it, so there is no material to supply or read back
+                  webKeyID:
+                    description: WebKeyID controls the following. The signing key
+                      to activate, as an ID or a reference to a WebKey managed by
+                      this provider
                     type: string
-                  ecdsaCurve:
-                    description: 'ECDSACurve controls the following. The curve for
-                      an ECDSA key: `ECDSA_CURVE_P256`, `ECDSA_CURVE_P384` or `ECDSA_CURVE_P512`.
-                      Zitadel documents P-256 as the default but rejects an unset
-                      curve rather than choosing one, so an empty field means P-256.
-                      Ignored for the other algorithms'
-                    type: string
-                  rsaBits:
-                    description: 'RSABits controls the following. The key size for
-                      an RSA key: `RSA_BITS_2048`, `RSA_BITS_3072` or `RSA_BITS_4096`.
-                      Zitadel''s default is 2048. Ignored for the other algorithms'
-                    type: string
-                  rsaHasher:
-                    description: 'RSAHasher controls the following. The signing algorithm
-                      for an RSA key: `RSA_HASHER_SHA256`, `RSA_HASHER_SHA384` or
-                      `RSA_HASHER_SHA512`. Zitadel''s default is SHA256. Ignored for
-                      the other algorithms'
-                    type: string
+                  webKeyRef:
+                    description: WebKeyRef controls the following. References a WebKey
+                      managed by this provider and uses its key
+                    properties:
+                      name:
+                        description: Name of the referenced object.
+                        type: string
+                      policy:
+                        description: Policies for referencing.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    required:
+                    - name
+                    type: object
+                  webKeySelector:
+                    description: WebKeySelector controls the following. Selects a
+                      WebKey managed by this provider and uses its key
+                    properties:
+                      matchControllerRef:
+                        description: |-
+                          MatchControllerRef ensures an object with the same controller reference
+                          as the selecting object is selected.
+                        type: boolean
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: MatchLabels ensures an object with matching labels
+                          is selected.
+                        type: object
+                      policy:
+                        description: Policies for selection.
+                        properties:
+                          resolution:
+                            default: Required
+                            description: |-
+                              Resolution specifies whether resolution of this reference is required.
+                              The default is 'Required', which means the reconcile will fail if the
+                              reference cannot be resolved. 'Optional' means this reference will be
+                              a no-op if it cannot be resolved.
+                            enum:
+                            - Required
+                            - Optional
+                            type: string
+                          resolve:
+                            description: |-
+                              Resolve specifies when this reference should be resolved. The default
+                              is 'IfNotPresent', which will attempt to resolve the reference only when
+                              the corresponding field is not present. Use 'Always' to resolve the
+                              reference on every reconcile.
+                            enum:
+                            - Always
+                            - IfNotPresent
+                            type: string
+                        type: object
+                    type: object
                 type: object
               managementPolicies:
                 default:
@@ -150,17 +205,13 @@ spec:
             - forProvider
             type: object
           status:
-            description: WebKeyStatus reports the observed state of a hold one of
-              Zitadel's own signing keys.
+            description: ActiveWebKeyStatus reports the observed state of a Zitadel
+              active signing key.
             properties:
               atProvider:
                 description: AtProvider is the observed state.
                 properties:
                   algorithm:
-                    type: string
-                  changeDate:
-                    type: string
-                  creationDate:
                     type: string
                   id:
                     type: string
@@ -220,6 +271,12 @@ spec:
                   it can not recover from without human intervention.
                 format: int64
                 type: integer
+              webKeyID:
+                description: |-
+                  WebKeyID is the key that was last found to be active, recorded so that a
+                  terminating resource can report on it without following a reference that
+                  may since have moved.
+                type: string
             type: object
         required:
         - spec

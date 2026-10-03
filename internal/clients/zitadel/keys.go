@@ -68,6 +68,13 @@ type WebKeyAlgorithm struct {
 	// RSAHasher is the signing algorithm, `RSA_HASHER_SHA256`,
 	// `RSA_HASHER_SHA384` or `RSA_HASHER_SHA512`. Ignored for the other types.
 	RSAHasher string
+
+	// ECDSACurve is the curve for an ECDSA key, `ECDSA_CURVE_P256`,
+	// `ECDSA_CURVE_P384` or `ECDSA_CURVE_P512`. Ignored for the other types.
+	//
+	// It has to be said: Zitadel documents P-256 as the default but rejects an
+	// unset curve as invalid rather than choosing one.
+	ECDSACurve string
 }
 
 // CreateWebKey makes Zitadel generate a signing key.
@@ -87,7 +94,12 @@ func (c *Client) CreateWebKey(ctx context.Context, alg WebKeyAlgorithm) (string,
 		req.Key = &webkey.CreateWebKeyRequest_Rsa{Rsa: &webkey.RSA{Bits: bits, Hasher: hasher}}
 
 	case "ecdsa":
-		req.Key = &webkey.CreateWebKeyRequest_Ecdsa{Ecdsa: &webkey.ECDSA{}}
+		curve, err := ecdsaCurve(alg)
+		if err != nil {
+			return "", err
+		}
+
+		req.Key = &webkey.CreateWebKeyRequest_Ecdsa{Ecdsa: &webkey.ECDSA{Curve: curve}}
 
 	case "ed25519":
 		req.Key = &webkey.CreateWebKeyRequest_Ed25519{Ed25519: &webkey.ED25519{}}
@@ -133,6 +145,24 @@ func rsaSettings(alg WebKeyAlgorithm) (webkey.RSABits, webkey.RSAHasher, error) 
 	}
 
 	return bits, hasher, nil
+}
+
+// ecdsaCurve reads the curve for an ECDSA key.
+//
+// Zitadel's own documentation calls P-256 the default, but an unset curve is
+// refused as invalid rather than being filled in, so the default is applied here.
+func ecdsaCurve(alg WebKeyAlgorithm) (webkey.ECDSACurve, error) {
+	if alg.ECDSACurve == "" {
+		return webkey.ECDSACurve_ECDSA_CURVE_P256, nil
+	}
+
+	v, ok := webkey.ECDSACurve_value[alg.ECDSACurve]
+	if !ok {
+		return 0, fmt.Errorf("zitadel has no ECDSA curve %q: it must be one of %v",
+			alg.ECDSACurve, webkey.ECDSACurve_name)
+	}
+
+	return webkey.ECDSACurve(v), nil
 }
 
 // GetWebKey reads one signing key, or nil when Zitadel does not have it.

@@ -48,6 +48,7 @@ import (
 	"github.com/loafoe/provider-zitadel/internal/controller/lockout_policy"
 	"github.com/loafoe/provider-zitadel/internal/controller/loginpolicy"
 	"github.com/loafoe/provider-zitadel/internal/controller/machinekey"
+	"github.com/loafoe/provider-zitadel/internal/controller/messaging"
 	"github.com/loafoe/provider-zitadel/internal/controller/notification_policy"
 	"github.com/loafoe/provider-zitadel/internal/controller/oidcapplication"
 	"github.com/loafoe/provider-zitadel/internal/controller/organization"
@@ -137,6 +138,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		instancesettings.Setup,
 		domains.Setup,
 		keys.Setup,
+		messaging.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err

@@ -1,0 +1,20 @@
+# An example of a Zitadel HTTP email provider.
+#
+# Apply it with:
+#
+#     kubectl apply -f email_provider_http.yaml
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: EmailProviderHTTP
+metadata:
+  name: zitadel-email-http
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    # Receives the same payload Zitadel would hand an SMTP server, so the
+    # endpoint has to understand it.
+    endpoint: "https://email.example.com/send"
+    description: "The instance wide email provider"

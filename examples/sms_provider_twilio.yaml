@@ -1,0 +1,24 @@
+# An example of a Zitadel Twilio SMS provider.
+#
+# Apply it with:
+#
+#     kubectl apply -f sms_provider_twilio.yaml
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: SMSProviderTwilio
+metadata:
+  name: zitadel-twilio
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    sid: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    # The token is a secret, and Zitadel sets it through a call of its own and
+    # never returns it.
+    tokenSecretRef:
+      name: zitadel-twilio
+      key: token
+    senderNumber: "+441234567890"
+    description: "The instance wide SMS provider"

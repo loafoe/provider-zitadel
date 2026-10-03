@@ -71,6 +71,15 @@ func (l *ActionTargetPublicKeyList) GetItems() []resource.Managed {
 	return items
 }
 
+// GetItems of this ActiveWebKeyList.
+func (l *ActiveWebKeyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
 // GetItems of this ApplicationAPIList.
 func (l *ApplicationAPIList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
@@ -82,6 +91,15 @@ func (l *ApplicationAPIList) GetItems() []resource.Managed {
 
 // GetItems of this ApplicationKeyList.
 func (l *ApplicationKeyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this ApplicationSAMLList.
+func (l *ApplicationSAMLList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]
@@ -181,6 +199,24 @@ func (l *DefaultSecuritySettingsList) GetItems() []resource.Managed {
 
 // GetItems of this DomainPolicyList.
 func (l *DomainPolicyList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this EmailProviderHTTPList.
+func (l *EmailProviderHTTPList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this EmailProviderSMTPList.
+func (l *EmailProviderSMTPList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]
@@ -622,6 +658,24 @@ func (l *ProjectMemberList) GetItems() []resource.Managed {
 
 // GetItems of this ProjectRoleList.
 func (l *ProjectRoleList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this SMSProviderHTTPList.
+func (l *SMSProviderHTTPList) GetItems() []resource.Managed {
+	items := make([]resource.Managed, len(l.Items))
+	for i := range l.Items {
+		items[i] = &l.Items[i]
+	}
+	return items
+}
+
+// GetItems of this SMSProviderTwilioList.
+func (l *SMSProviderTwilioList) GetItems() []resource.Managed {
 	items := make([]resource.Managed, len(l.Items))
 	for i := range l.Items {
 		items[i] = &l.Items[i]

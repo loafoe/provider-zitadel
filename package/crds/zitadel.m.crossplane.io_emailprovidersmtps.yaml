@@ -4,16 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
-  name: webkeys.zitadel.m.crossplane.io
+  name: emailprovidersmtps.zitadel.m.crossplane.io
 spec:
   group: zitadel.m.crossplane.io
   names:
     categories:
     - zitadel
-    kind: WebKey
-    listKind: WebKeyList
-    plural: webkeys
-    singular: webkey
+    kind: EmailProviderSMTP
+    listKind: EmailProviderSMTPList
+    plural: emailprovidersmtps
+    singular: emailprovidersmtp
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -23,6 +23,9 @@ spec:
     - jsonPath: .status.conditions[?(@.type=='Synced')].status
       name: SYNCED
       type: string
+    - jsonPath: .status.atProvider.state
+      name: STATE
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
@@ -30,18 +33,12 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          WebKey is a managed resource that hold one of Zitadel's own signing keys.
+          EmailProviderSMTP is a managed resource that have Zitadel send email through an SMTP server.
 
-          Zitadel signs its tokens with one of these, and an application verifies
-          them with the active one. The private half never leaves Zitadel, so a key
-          this provider manages is an identity and a state and nothing more:
-
-            - Zitadel creates it inactive, so it verifies nothing until activated.
-              ActivatedWebKey is what does that.
-            - The key type cannot be changed, only replaced, so changing the algorithm
-              is reported as needing a new key rather than silently ignored.
-            - Zitadel refuses to remove the active key, so it has to be activated
-              away first.
+          This is a namespaced object managing state that belongs to the whole
+          Zitadel instance. Zitadel sends through one provider of each kind, so
+          two of these of the same kind in different namespaces would be asking
+          for the same thing and the second would win.
         properties:
           apiVersion:
             description: |-
@@ -61,34 +58,67 @@ spec:
           metadata:
             type: object
           spec:
-            description: WebKeySpec defines the desired state of a WebKey.
+            description: EmailProviderSMTPSpec defines the desired state of a EmailProviderSMTP.
             properties:
               forProvider:
-                description: WebKeyParameters is the desired configuration of a hold
-                  one of Zitadel's own signing keys.
+                description: EmailProviderSMTPParameters is the desired configuration
+                  of a Zitadel SMTP email provider.
                 properties:
-                  algorithm:
-                    description: Algorithm controls the following. `rsa`, `ecdsa`
-                      or `ed25519`. Zitadel generates the key; the private half never
-                      leaves it, so there is no material to supply or read back
+                  description:
+                    description: Description controls the following. What this provider
+                      is for, shown in the Zitadel console
                     type: string
-                  ecdsaCurve:
-                    description: 'ECDSACurve controls the following. The curve for
-                      an ECDSA key: `ECDSA_CURVE_P256`, `ECDSA_CURVE_P384` or `ECDSA_CURVE_P512`.
-                      Zitadel documents P-256 as the default but rejects an unset
-                      curve rather than choosing one, so an empty field means P-256.
-                      Ignored for the other algorithms'
+                  host:
+                    description: |-
+                      Host controls the following. The SMTP server, as `host:port`, such as `smtp.example.com:587`. Zitadel does not connect to it when the provider is added, only when something is sent, so it can be set up ahead of a server that is not reachable yet
+
+                      It is required: Zitadel cannot do without it.
                     type: string
-                  rsaBits:
-                    description: 'RSABits controls the following. The key size for
-                      an RSA key: `RSA_BITS_2048`, `RSA_BITS_3072` or `RSA_BITS_4096`.
-                      Zitadel''s default is 2048. Ignored for the other algorithms'
+                  passwordSecretRef:
+                    description: 'PasswordSecretRef controls the following. That account''s
+                      password. Zitadel never returns it, so it is applied and then
+                      left alone: an update that carries none leaves the stored password
+                      as it is. It is a secret rather than a field so that it is not
+                      readable by anyone who can read this object'
+                    properties:
+                      key:
+                        description: Key inside the secret.
+                        minLength: 1
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        minLength: 1
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
+                  replyToAddress:
+                    description: ReplyToAddress controls the following. Where a reply
+                      should go, when that is not the sender address
                     type: string
-                  rsaHasher:
-                    description: 'RSAHasher controls the following. The signing algorithm
-                      for an RSA key: `RSA_HASHER_SHA256`, `RSA_HASHER_SHA384` or
-                      `RSA_HASHER_SHA512`. Zitadel''s default is SHA256. Ignored for
-                      the other algorithms'
+                  senderAddress:
+                    description: SenderAddress controls the following. The address
+                      Zitadel sends from, such as `noreply@example.com`. It has to
+                      be a domain the organization owns
+                    type: string
+                  senderName:
+                    description: SenderName controls the following. The name shown
+                      as the sender of an email Zitadel sends
+                    type: string
+                  state:
+                    description: |-
+                      State is whether Zitadel sends through this provider. Empty leaves
+                      Zitadel's own choice, which is to send through it.
+                    type: string
+                  tls:
+                    description: 'TLS controls the following. Connect over TLS. Zitadel
+                      calls this `tls` rather than `starttls`: it means the connection
+                      is wrapped from the start, which is what port 465 expects'
+                    type: boolean
+                  user:
+                    description: User controls the following. The account Zitadel
+                      authenticates to the server as
                     type: string
                 type: object
               managementPolicies:
@@ -150,21 +180,31 @@ spec:
             - forProvider
             type: object
           status:
-            description: WebKeyStatus reports the observed state of a hold one of
-              Zitadel's own signing keys.
+            description: EmailProviderSMTPStatus reports the observed state of a Zitadel
+              SMTP email provider.
             properties:
               atProvider:
                 description: AtProvider is the observed state.
                 properties:
-                  algorithm:
+                  description:
                     type: string
-                  changeDate:
-                    type: string
-                  creationDate:
+                  host:
                     type: string
                   id:
                     type: string
+                  kind:
+                    type: string
+                  replyToAddress:
+                    type: string
+                  senderAddress:
+                    type: string
+                  senderName:
+                    type: string
                   state:
+                    type: string
+                  tls:
+                    type: boolean
+                  user:
                     type: string
                 type: object
               conditions:

@@ -1,0 +1,31 @@
+# An example of a Zitadel SAML application.
+#
+# Apply it with:
+#
+#     kubectl apply -f application_saml.yaml
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: ApplicationSAML
+metadata:
+  name: billing-saml
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    organizationRef:
+      name: platform
+    projectRef:
+      name: billing
+    name: Billing SAML
+    # Exactly one of metadata and metadataURL: Zitadel requires one or the other.
+    #
+    # The document itself always works, because Zitadel has to fetch nothing. A
+    # URL is only worth using when Zitadel can reach it.
+    metadata: |
+      <?xml version="1.0"?>
+      <EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata"
+                        entityID="https://idp.example.com"/>
+    # Which login screen the user is sent to. Empty leaves the instance default.
+    loginVersion: "LoginV1"

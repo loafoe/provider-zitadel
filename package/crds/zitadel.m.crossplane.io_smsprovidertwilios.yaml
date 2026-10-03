@@ -4,16 +4,16 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.18.0
-  name: webkeys.zitadel.m.crossplane.io
+  name: smsprovidertwilios.zitadel.m.crossplane.io
 spec:
   group: zitadel.m.crossplane.io
   names:
     categories:
     - zitadel
-    kind: WebKey
-    listKind: WebKeyList
-    plural: webkeys
-    singular: webkey
+    kind: SMSProviderTwilio
+    listKind: SMSProviderTwilioList
+    plural: smsprovidertwilios
+    singular: smsprovidertwilio
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -23,6 +23,9 @@ spec:
     - jsonPath: .status.conditions[?(@.type=='Synced')].status
       name: SYNCED
       type: string
+    - jsonPath: .status.atProvider.state
+      name: STATE
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
@@ -30,18 +33,12 @@ spec:
     schema:
       openAPIV3Schema:
         description: |-
-          WebKey is a managed resource that hold one of Zitadel's own signing keys.
+          SMSProviderTwilio is a managed resource that have Zitadel send SMS through Twilio.
 
-          Zitadel signs its tokens with one of these, and an application verifies
-          them with the active one. The private half never leaves Zitadel, so a key
-          this provider manages is an identity and a state and nothing more:
-
-            - Zitadel creates it inactive, so it verifies nothing until activated.
-              ActivatedWebKey is what does that.
-            - The key type cannot be changed, only replaced, so changing the algorithm
-              is reported as needing a new key rather than silently ignored.
-            - Zitadel refuses to remove the active key, so it has to be activated
-              away first.
+          This is a namespaced object managing state that belongs to the whole
+          Zitadel instance. Zitadel sends through one provider of each kind, so
+          two of these of the same kind in different namespaces would be asking
+          for the same thing and the second would win.
         properties:
           apiVersion:
             description: |-
@@ -61,34 +58,54 @@ spec:
           metadata:
             type: object
           spec:
-            description: WebKeySpec defines the desired state of a WebKey.
+            description: SMSProviderTwilioSpec defines the desired state of a SMSProviderTwilio.
             properties:
               forProvider:
-                description: WebKeyParameters is the desired configuration of a hold
-                  one of Zitadel's own signing keys.
+                description: SMSProviderTwilioParameters is the desired configuration
+                  of a Zitadel Twilio SMS provider.
                 properties:
-                  algorithm:
-                    description: Algorithm controls the following. `rsa`, `ecdsa`
-                      or `ed25519`. Zitadel generates the key; the private half never
-                      leaves it, so there is no material to supply or read back
+                  description:
+                    description: Description controls the following. What this provider
+                      is for, shown in the Zitadel console
                     type: string
-                  ecdsaCurve:
-                    description: 'ECDSACurve controls the following. The curve for
-                      an ECDSA key: `ECDSA_CURVE_P256`, `ECDSA_CURVE_P384` or `ECDSA_CURVE_P512`.
-                      Zitadel documents P-256 as the default but rejects an unset
-                      curve rather than choosing one, so an empty field means P-256.
-                      Ignored for the other algorithms'
+                  senderNumber:
+                    description: SenderNumber controls the following. The number messages
+                      are sent from, in E.164 form such as `+441234567890`
                     type: string
-                  rsaBits:
-                    description: 'RSABits controls the following. The key size for
-                      an RSA key: `RSA_BITS_2048`, `RSA_BITS_3072` or `RSA_BITS_4096`.
-                      Zitadel''s default is 2048. Ignored for the other algorithms'
+                  sid:
+                    description: |-
+                      SID controls the following. The Twilio account SID
+
+                      It is required: Zitadel cannot do without it.
                     type: string
-                  rsaHasher:
-                    description: 'RSAHasher controls the following. The signing algorithm
-                      for an RSA key: `RSA_HASHER_SHA256`, `RSA_HASHER_SHA384` or
-                      `RSA_HASHER_SHA512`. Zitadel''s default is SHA256. Ignored for
-                      the other algorithms'
+                  state:
+                    description: |-
+                      State is whether Zitadel sends through this provider. Empty leaves
+                      Zitadel's own choice, which is to send through it.
+                    type: string
+                  tokenSecretRef:
+                    description: TokenSecretRef controls the following. The Twilio
+                      auth token. Zitadel never returns it and sets it through a call
+                      of its own, so it is applied and then left alone. It is a secret
+                      rather than a field so that it is not readable by anyone who
+                      can read this object
+                    properties:
+                      key:
+                        description: Key inside the secret.
+                        minLength: 1
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        minLength: 1
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
+                  verifyServiceSID:
+                    description: VerifyServiceSID controls the following. The SID
+                      of a Twilio Verify service, when messages go through one rather
+                      than through the account directly
                     type: string
                 type: object
               managementPolicies:
@@ -150,21 +167,25 @@ spec:
             - forProvider
             type: object
           status:
-            description: WebKeyStatus reports the observed state of a hold one of
-              Zitadel's own signing keys.
+            description: SMSProviderTwilioStatus reports the observed state of a Zitadel
+              Twilio SMS provider.
             properties:
               atProvider:
                 description: AtProvider is the observed state.
                 properties:
-                  algorithm:
-                    type: string
-                  changeDate:
-                    type: string
-                  creationDate:
+                  description:
                     type: string
                   id:
                     type: string
+                  kind:
+                    type: string
+                  senderNumber:
+                    type: string
+                  sid:
+                    type: string
                   state:
+                    type: string
+                  verifyServiceSID:
                     type: string
                 type: object
               conditions:

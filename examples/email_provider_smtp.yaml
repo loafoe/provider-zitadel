@@ -1,0 +1,33 @@
+# An example of a Zitadel SMTP email provider.
+#
+# Apply it with:
+#
+#     kubectl apply -f email_provider_smtp.yaml
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: EmailProviderSMTP
+metadata:
+  name: zitadel-smtp
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    # host:port. Zitadel does not connect when the provider is added, only when
+    # something is sent, so this can be set up ahead of a server that is not
+    # reachable yet.
+    host: "smtp.example.com:587"
+    user: "zitadel@example.com"
+    # The password is a secret rather than a field, so it is not readable by
+    # anyone who can read this object. Zitadel never returns it, so it is applied
+    # and then left alone.
+    passwordSecretRef:
+      name: zitadel-smtp
+      key: password
+    senderAddress: "noreply@example.com"
+    senderName: "Example"
+    # Zitadel calls this tls rather than starttls: it means the connection is
+    # wrapped from the start, which is what port 465 expects.
+    tls: true
+    description: "The instance wide email provider"

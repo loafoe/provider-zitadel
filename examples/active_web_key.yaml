@@ -1,0 +1,25 @@
+# An example of a Zitadel active signing key.
+#
+# Apply it with:
+#
+#     kubectl apply -f active_web_key.yaml
+#
+apiVersion: zitadel.m.crossplane.io/v1alpha1
+kind: ActiveWebKey
+metadata:
+  name: zitadel-active-key
+  namespace: zitadel
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ProviderConfig
+  forProvider:
+    webKeyRef:
+      name: zitadel-web-key
+    #
+    # There is one active key on an instance, so two of these in different
+    # namespaces would be fighting over the same setting. Activating another key
+    # makes this one stale and the former inactive.
+    #
+    # Zitadel will not remove a key that is active, so a key this points at has
+    # to be activated away before it can be deleted.

@@ -440,3 +440,70 @@ func TestEnumsAreReadThroughTheirNameMaps(t *testing.T) {
 		}
 	}
 }
+
+// A JSON name is written by hand for every generated field, and the hand-written
+// ones drift: `ID` came out as `iD` and `Algorithm` as `Algorithm`.
+//
+// Both shipped. The first only showed up in a live status, and the second only
+// showed up because the status was empty where it should have had fields.
+func TestGeneratedJSONNamesFollowTheInitialismRules(t *testing.T) {
+	// The same rules the generator applies, pinned here so a change to one side
+	// without the other fails.
+	for _, tc := range []struct{ goName, want string }{
+		{"ID", "id"},
+		{"SID", "sid"},
+		{"TLS", "tls"},
+		{"Algorithm", "algorithm"},
+		{"Name", "name"},
+		{"Description", "description"},
+		{"State", "state"},
+		{"Kind", "kind"},
+		{"Host", "host"},
+		{"Endpoint", "endpoint"},
+		{"SenderAddress", "senderAddress"},
+		{"VerifyServiceSID", "verifyServiceSID"},
+		{"ProjectID", "projectID"},
+		{"ApplicationID", "applicationID"},
+		{"UserID", "userID"},
+		{"MetadataXML", "metadataXML"},
+		{"LoginVersion", "loginVersion"},
+		{"OrganizationID", "organizationID"},
+	} {
+		t.Run(tc.goName, func(t *testing.T) {
+			if got := generatedJSONName(tc.goName); got != tc.want {
+				t.Errorf("%s serialises as %q, want %q", tc.goName, got, tc.want)
+			}
+		})
+	}
+}
+
+// generatedJSONName is the rule hack/gen_final_types.py applies. It is repeated
+// rather than imported because the generator is a script, not a package.
+func generatedJSONName(name string) string {
+	n := 0
+	for n < len(name) && name[n] >= 'A' && name[n] <= 'Z' {
+		n++
+	}
+
+	switch {
+	case n == 0:
+		return name
+	case n == len(name):
+		return lower(name)
+	case n == 1:
+		return lower(name[:1]) + name[1:]
+	default:
+		return lower(name[:n-1]) + name[n-1:]
+	}
+}
+
+func lower(s string) string {
+	out := []rune(s)
+	for i := range out {
+		if out[i] >= 'A' && out[i] <= 'Z' {
+			out[i] += 'a' - 'A'
+		}
+	}
+
+	return string(out)
+}

@@ -54,7 +54,9 @@ team.
 | `LockoutPolicy` … `DefaultSecuritySettings` | The seven organization policies, and the ten instance-wide policies they inherit from. |
 | `InstanceFeatures`, `SystemFeatures`, `InstanceRestrictions`, `InstanceSecretGenerator` | The four instance wide settings that are a single value: the feature flags, the registration restrictions, and the shape of one of Zitadel's generated codes. |
 | `InstanceCustomDomain`, `InstanceTrustedDomain`, `OrganizationDomain` | The three lists of domains: the ones the instance answers on, the ones allowed to ask it for a token, and the ones an organization owns. |
-| `WebKey`, `ApplicationKey`, `ProjectMember` | Zitadel's own signing keys, the key an application authenticates itself with, and a user's roles on a project. |
+| `WebKey`, `ActiveWebKey`, `ApplicationKey`, `ProjectMember` | Zitadel's own signing keys and which one is active, the key an application authenticates itself with, and a user's roles on a project. |
+| `ApplicationSAML` | A SAML application alongside the API and OIDC ones. |
+| `EmailProviderSMTP`, `EmailProviderHTTP`, `SMSProviderTwilio`, `SMSProviderHTTP` | The providers Zitadel sends its codes and notifications through. |
 | `IDPOIDC`, `IDPOAuth`, `IDPApple`, `IDPAzureAD`, `IDPGitHub`, `IDPGitHubEnterpriseServer`, `IDPGitLab`, `IDPGitLabSelfHosted`, `IDPGoogle`, `IDPLDAP`, `IDPSAML` | Identity providers available to every organization that has not set up its own. |
 | `OrgIDPOIDC`, `OrgIDPOAuth`, `OrgIDPJWT`, `OrgIDPApple`, `OrgIDPAzureAD`, `OrgIDPGitHub`, `OrgIDPGitHubEnterpriseServer`, `OrgIDPGitLab`, `OrgIDPGitLabSelfHosted`, `OrgIDPGoogle`, `OrgIDPLDAP`, `OrgIDPSAML` | The same providers, belonging to one organization. |
 
@@ -89,6 +91,8 @@ at when a manifest fails:
   `InstanceTrustedDomain` and `OrganizationDomain`. A domain is a name in a list
   and nothing else, so they share a harness with no equality function at all: the
   name is the identity, and once it is in the list there is nothing to compare.
+* **Messaging** — the four providers Zitadel sends codes and notifications
+  through, and `ApplicationSAML`.
 * **Keys and grants** — `WebKey` (a signing key Zitadel generates),
   `ApplicationKey` (the key an application authenticates itself with, whose
   private half is written to the connection secret), and `ProjectMember`.
@@ -618,30 +622,10 @@ Natural next steps, roughly in the order they tend to be needed:
 ### Coverage against the Terraform provider
 
 The official Zitadel Terraform provider registers **89** managed resources. This
-provider currently models **74** of them, one for one:
+provider currently models **80** of them, one for one.
 
-| | |
-|---|---|
-| Raw parity | 74 / 89 = **83%** |
-| Adjusted parity | 74 / 80 = **92%** |
-
-The adjusted figure drops five of the 89: two localisation resources
-(`default_hosted_login_translation`, `hosted_login_translation`), which carry
-translated UI text rather than infrastructure, and three deprecated aliases
-(`zitadel_org`, `zitadel_project_v2`, `zitadel_application_v2`) kept only for
-backwards compatibility and shadowed by kinds this provider models directly.
-
-What is left is 6 of the 80 worth modelling:
-
-* **Messaging** — `email_provider_http`, `email_provider_smtp`,
-  `sms_provider_http` and `sms_provider_twilio`, which are the providers Zitadel
-  sends its codes and notifications through.
-* **Keys** — `active_webkey`, which points at the signing key Zitadel signs with.
-* **The rest** — `application_saml`, a SAML application alongside the API and OIDC
-  ones.
-
-Nine of the Terraform provider's 89 resources are deliberately not modelled, and
-the reasons are written down rather than left implicit:
+**Everything worth modelling is modelled.** What is left is the nine that should
+not be, and the reasons are written down rather than left implicit:
 
 | Not modelled | Why |
 | --- | --- |
@@ -652,7 +636,22 @@ the reasons are written down rather than left implicit:
 
 `./hack/parity.py <path to terraform-provider-zitadel>` checks all of this against
 the Terraform provider's own source and exits non-zero while anything worth
-modelling is missing, so the figures above cannot drift away from it:
+modelling is missing, so the figures cannot drift away from it. It reports
+**80 of 89 raw, and 80 of 80 adjusted**:
+
+| | Count |
+| --- | --- |
+| Terraform provider resources | 89 |
+| Modelled here, one for one | 80 |
+| Deliberately not modelled | 9 |
+
+Two of the eighty are ours in a way the Terraform provider's are not: a v2
+application is split here into `ApplicationAPI` and `OIDCApplication`, because
+Zitadel has one application service with three types in it and the two kinds
+carry genuinely different settings.
+
+The Terraform provider registers 89 resources, which the following reads straight
+out of its own source:
 
 ```console
 git clone --depth 1 --filter=blob:none --sparse \
