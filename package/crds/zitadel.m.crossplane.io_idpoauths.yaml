@@ -87,6 +87,14 @@ spec:
                         description: Name of the secret.
                         minLength: 1
                         type: string
+                      namespace:
+                        description: |-
+                          Namespace of the secret.
+
+                          A namespaced resource leaves this empty and the secret is read from the
+                          resource's own namespace. A cluster scoped resource has no namespace to
+                          fall back on, so it must say here which namespace the secret is in.
+                        type: string
                     required:
                     - key
                     - name

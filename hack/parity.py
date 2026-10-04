@@ -120,6 +120,21 @@ EXCLUDED = {
     "smtp_config": "Deprecated by the Terraform provider in favour of email_provider_smtp.",
 }
 
+# The kinds that also have a cluster scoped form, because they manage state that
+# belongs to a whole Zitadel instance and are a singleton. The rest deliberately do
+# not: they are ZITADEL-global but there can be many of them, and a namespace is
+# how you separate them.
+#
+# See the "Scoped resources" section of the README for the reasoning.
+CLUSTER = {
+    "InstanceFeatures", "SystemFeatures", "InstanceRestrictions", "InstanceSecretGenerator",
+    "ActiveWebKey",
+    "DefaultDomainPolicy", "DefaultLabelPolicy", "DefaultLockoutPolicy", "DefaultLoginPolicy",
+    "DefaultNotificationPolicy", "DefaultOIDCSettings", "DefaultPasswordAgePolicy",
+    "DefaultPasswordComplexityPolicy", "DefaultPrivacyPolicy", "DefaultSecuritySettings",
+    "EmailProviderHTTP", "EmailProviderSMTP", "SMSProviderHTTP", "SMSProviderTwilio",
+}
+
 # The provider registers each resource in a map pointing at the package that
 # implements it.
 RESOURCE_MAP = re.compile(r'"(zitadel_[a-z0-9_]+)"\s*:\s*([a-z0-9_]+)\.GetResource\(\)')
@@ -127,13 +142,20 @@ IMPORT = re.compile(r'^\s*([a-z0-9_]+)\s+"github.com/zitadel/terraform-provider-
 
 
 def our_kinds(crds):
-    """Every managed kind, read from the CRDs rather than from a list."""
+    """Every managed kind, read from the CRDs rather than from a list.
+
+    Both groups are read: the namespaced managed resources and the cluster scoped
+    variants that mirror them. A cluster variant is the same capability, so it is
+    not counted twice - which is why the table names one resource per capability
+    and the cluster kind is looked up alongside it.
+    """
     out = []
     for f in sorted(os.listdir(crds)):
-        if not f.startswith("zitadel.m.crossplane.io_"):
+        if not f.startswith("zitadel.m.crossplane.io_") and not f.startswith("zitadel.crossplane.io_cluster"):
             continue
         m = re.search(r"^\s+kind:\s*(\S+)\s*$", open(os.path.join(crds, f)).read(), re.M)
-        if m:
+        if m and m.group(1) not in ("ProviderConfig", "ProviderConfigUsage",
+                                    "ClusterProviderConfig", "ClusterProviderConfigUsage"):
             out.append(m.group(1))
     return out
 
@@ -154,7 +176,12 @@ def main():
 
     # Every kind this table claims must exist, or the table is describing a
     # provider that no longer has it.
-    claimed = {k.strip() for v in MODELLED.values() for k in v.split(",")}
+    # A cluster scoped variant is the same capability as the kind it mirrors, so
+    # it satisfies that entry rather than counting as one of its own. Only the
+    # kinds listed in CLUSTER are expected to have one, and saying so here means a
+    # missing or unexpected variant is an error rather than a quiet count.
+    base = {k.strip() for v in MODELLED.values() for k in v.split(",")}
+    claimed = base | {"Cluster" + k for k in base if k in CLUSTER}
     missing_kinds = sorted(claimed - set(ours))
     # And every kind that exists must be in the table, or a new resource would
     # silently not count.
@@ -168,6 +195,9 @@ def main():
     print("Managed resource kinds here   : %d" % len(ours))
     print("Capabilities modelled         : %d" % len(MODELLED))
     print("Deliberately not modelled     : %d" % len(EXCLUDED))
+    print()
+    clustered = sum(1 for k in ours if k.startswith("Cluster"))
+    print("  of which cluster scoped variants : %d" % clustered)
     print()
     print("Raw parity      : %d/%d = %d%%" % (len(MODELLED), len(theirs), round(100 * len(MODELLED) / len(theirs))))
     print("Adjusted parity : %d/%d = %d%%" % (len(MODELLED), len(theirs) - len(EXCLUDED),

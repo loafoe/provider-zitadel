@@ -1,0 +1,21 @@
+# An example of a ClusterDefaultSecuritySettings.
+#
+# This is the cluster scoped form of DefaultSecuritySettings. The namespaced kind is kept and
+# behaves identically; use whichever suits the cluster.
+#
+# It manages the instance wide security settings.
+#
+# It is the instance default, so it exists once however it is scoped.
+#
+# A cluster scoped resource cannot name a secret in a namespace, so it
+# references a ClusterProviderConfig, whose credential references say which
+# namespace their secret is in.
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ClusterDefaultSecuritySettings
+metadata:
+  name: cluster-default-security-settings
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    enableImpersonation: false
+    embeddedIframe: false

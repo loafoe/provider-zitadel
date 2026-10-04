@@ -43,8 +43,15 @@ type NewExternalClientFn func(ctx context.Context, kube client.Client, mg resour
 // connector resolves the ProviderConfig of a managed resource and builds the
 // external client used to reconcile it.
 type connector struct {
-	kube        client.Client
-	usage       *resource.ProviderConfigUsageTracker
+	kube  client.Client
+	usage *resource.ProviderConfigUsageTracker
+
+	// clusterUsage tracks usage of a ClusterProviderConfig, which is what a
+	// cluster scoped resource references. A namespaced resource that points at
+	// one is tracked here too, so that deleting the configuration can find
+	// everything using it.
+	clusterUsage *resource.ProviderConfigUsageTracker
+
 	newExternal NewExternalClientFn
 }
 
@@ -57,7 +64,7 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.New("managed resource does not support provider config references")
 	}
 
-	if err := c.usage.Track(ctx, m); err != nil {
+	if err := c.usageTracker(m).Track(ctx, m); err != nil {
 		return nil, errors.Wrap(err, "cannot track ProviderConfig usage")
 	}
 
@@ -76,6 +83,21 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 
 	return &externalClient{ExternalClient: ec}, nil
+}
+
+// usageTracker picks the tracker that matches what the resource references.
+//
+// The two track different objects: a resource pointing at a ClusterProviderConfig
+// has to be recorded as a ClusterProviderConfigUsage, because a namespaced usage
+// cannot be created for a cluster scoped resource and would not be found when the
+// configuration is deleted.
+func (c *connector) usageTracker(m resource.ModernManaged) *resource.ProviderConfigUsageTracker {
+	ref := m.GetProviderConfigReference()
+	if ref != nil && ref.Kind == "ClusterProviderConfig" {
+		return c.clusterUsage
+	}
+
+	return c.usage
 }
 
 // externalClient decorates the errors of an ExternalClient. It is the single
@@ -113,8 +135,11 @@ func SetupManagedResourceController(mgr ctrl.Manager, o controller.Options, grou
 
 	opts := []managed.ReconcilerOption{
 		managed.WithExternalConnector(&connector{
-			kube:        mgr.GetClient(),
-			usage:       resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
+			kube: mgr.GetClient(),
+			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(),
+				&apisv1alpha1.ProviderConfigUsage{}),
+			clusterUsage: resource.NewProviderConfigUsageTracker(mgr.GetClient(),
+				&apisv1alpha1.ClusterProviderConfigUsage{}),
 			newExternal: newExternal,
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),

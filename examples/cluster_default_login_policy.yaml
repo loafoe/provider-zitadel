@@ -1,0 +1,25 @@
+# An example of a ClusterDefaultLoginPolicy.
+#
+# This is the cluster scoped form of DefaultLoginPolicy. The namespaced kind is kept and
+# behaves identically; use whichever suits the cluster.
+#
+# It manages what an organization allows until it customises its own.
+#
+# It is the instance default, so it exists once however it is scoped.
+#
+# A cluster scoped resource cannot name a secret in a namespace, so it
+# references a ClusterProviderConfig, whose credential references say which
+# namespace their secret is in.
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ClusterDefaultLoginPolicy
+metadata:
+  name: cluster-default-login-policy
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    allowUsernamePassword: true
+    allowRegister: false
+    ignoreUnknownUsernames: true
+    passwordlessType: "NotAllowed"
+    passwordCheckLifetime: "24h"
+    secondFactors: ["OTP", "OTPEmail"]

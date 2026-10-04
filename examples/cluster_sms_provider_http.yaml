@@ -1,0 +1,26 @@
+# An example of a ClusterSMSProviderHTTP.
+#
+# This is the cluster scoped form of SMSProviderHTTP. The namespaced kind is kept and
+# behaves identically; use whichever suits the cluster.
+#
+# It manages the endpoint Zitadel posts SMS to.
+#
+# Zitadel sends through one of these, so two namespaced copies would
+# be fighting over the same provider.
+#
+# A cluster scoped resource cannot name a secret in a namespace, so it
+# references a ClusterProviderConfig, whose credential references say which
+# namespace their secret is in.
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ClusterSMSProviderHTTP
+metadata:
+  name: cluster-sms-provider-http
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ClusterProviderConfig
+  forProvider:
+    # Receives the same payload Zitadel would hand an SMS gateway, so the
+    # endpoint has to understand it.
+    endpoint: "https://sms.example.com/send"
+    description: "The instance wide SMS provider"

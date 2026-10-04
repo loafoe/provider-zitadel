@@ -1,0 +1,31 @@
+# An example of a ClusterActiveWebKey.
+#
+# This is the cluster scoped form of ActiveWebKey. The namespaced kind is kept and
+# behaves identically; use whichever suits the cluster.
+#
+# It manages which of Zitadel's signing keys is the active one.
+#
+# There is one active key on an instance, so a namespaced copy in two
+# namespaces would be activating different keys at once.
+#
+# A cluster scoped resource cannot name a secret in a namespace, so it
+# references a ClusterProviderConfig, whose credential references say which
+# namespace their secret is in.
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ClusterActiveWebKey
+metadata:
+  name: cluster-active-web-key
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ClusterProviderConfig
+  forProvider:
+    webKeyRef:
+      name: zitadel-web-key
+    #
+    # There is one active key on an instance, so two of these in different
+    # namespaces would be fighting over the same setting. Activating another key
+    # makes this one stale and the former inactive.
+    #
+    # Zitadel will not remove a key that is active, so a key this points at has
+    # to be activated away before it can be deleted.

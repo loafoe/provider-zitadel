@@ -1,0 +1,23 @@
+# An example of a ClusterDefaultOIDCSettings.
+#
+# This is the cluster scoped form of DefaultOIDCSettings. The namespaced kind is kept and
+# behaves identically; use whichever suits the cluster.
+#
+# It manages the instance wide OIDC defaults.
+#
+# It is the instance default, so it exists once however it is scoped.
+#
+# A cluster scoped resource cannot name a secret in a namespace, so it
+# references a ClusterProviderConfig, whose credential references say which
+# namespace their secret is in.
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ClusterDefaultOIDCSettings
+metadata:
+  name: cluster-default-oidc-settings
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    accessTokenLifetime: "1h"
+    idTokenLifetime: "1h"
+    refreshTokenExpiration: "720h"
+    refreshTokenIdleExpiration: "56h"

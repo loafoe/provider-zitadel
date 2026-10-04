@@ -179,3 +179,150 @@ type ProviderConfigUsageList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ProviderConfigUsage `json:"items"`
 }
+
+// ClusterServiceAccountAuth holds the credentials of a Zitadel service account,
+// for a cluster scoped configuration.
+type ClusterServiceAccountAuth struct {
+	// KeySecretRef references the secret key holding the JSON encoded machine key
+	// of a Zitadel service account, i.e. the key file downloaded from the
+	// Zitadel console.
+	//
+	// It names a namespace because the configuration is cluster scoped: there is
+	// no namespace of its own to look the secret up in, so it has to say where
+	// the secret lives.
+	// +kubebuilder:validation:Required
+	KeySecretRef xpv1.SecretKeySelector `json:"keySecretRef"`
+}
+
+// ClusterTokenAuth holds a Zitadel Personal Access Token, for a cluster scoped
+// configuration.
+type ClusterTokenAuth struct {
+	// TokenSecretRef references the secret key holding the Personal Access Token
+	// of a Zitadel service account.
+	//
+	// It names a namespace, for the same reason as above.
+	// +kubebuilder:validation:Required
+	TokenSecretRef xpv1.SecretKeySelector `json:"tokenSecretRef"`
+}
+
+// ClusterZitadelCredentials is the authentication of a cluster scoped
+// configuration.
+//
+// It is the same two ways of authenticating as a namespaced configuration, with
+// one difference that follows from the scope: a cluster scoped configuration has
+// no namespace of its own, so its secret references name one.
+type ClusterZitadelCredentials struct {
+	// Source of the provider credentials.
+	// +kubebuilder:validation:Enum=None;Secret
+	// +kubebuilder:default=Secret
+	Source xpv1.CredentialsSource `json:"source"`
+
+	// AuthType specifies which Zitadel service account credential is used.
+	// +kubebuilder:validation:Required
+	AuthType AuthType `json:"authType"`
+
+	// ServiceAccount holds the machine key of a Zitadel service account.
+	// +optional
+	ServiceAccount *ClusterServiceAccountAuth `json:"serviceAccount,omitempty"`
+
+	// Token holds the Personal Access Token of a Zitadel service account.
+	// +optional
+	Token *ClusterTokenAuth `json:"token,omitempty"`
+}
+
+// ClusterProviderConfigSpec is the configuration of a ClusterProviderConfig.
+//
+// It is the ProviderConfig configuration with one difference, which the scope
+// forces: the credential secret is named with its namespace, because a cluster
+// scoped object has no namespace of its own to look one up in.
+type ClusterProviderConfigSpec struct {
+	// URL is the base URL of the Zitadel instance, i.e. the issuer of the
+	// instance. The gRPC API endpoint is derived from it (`<host>:443`, or
+	// `<host>:80` when insecure is enabled).
+	// +kubebuilder:validation:Required
+	URL string `json:"url"`
+
+	// Insecure disables TLS when talking to the Zitadel API. Only useful for
+	// local development instances without TLS.
+	// +optional
+	// +default=false
+	Insecure *bool `json:"insecure,omitempty"`
+
+	// InsecureSkipTLSVerify skips verification of the Zitadel server
+	// certificate. Only useful for instances using a self signed certificate.
+	// +optional
+	// +default=false
+	InsecureSkipTLSVerify *bool `json:"insecureSkipTLSVerify,omitempty"`
+
+	// OrganizationID sets the organization context (`x-zitadel-orgid`) used for
+	// all API calls that do not carry an explicit organization ID.
+	// +optional
+	OrganizationID *string `json:"organizationID,omitempty"`
+
+	// Credentials contains the authentication configuration for Zitadel.
+	// +kubebuilder:validation:Required
+	Credentials ClusterZitadelCredentials `json:"credentials"`
+}
+
+// A ClusterProviderConfigStatus defines the status of a ClusterProviderConfig.
+type ClusterProviderConfigStatus struct {
+	xpv1.ProviderConfigStatus `json:",inline"`
+}
+
+// +kubebuilder:object:root=true
+
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="URL",type="string",JSONPath=".spec.url"
+// +kubebuilder:resource:scope=Cluster,categories={crossplane,provider,zitadel}
+// A ClusterProviderConfig configures a Zitadel provider for cluster scoped
+// resources.
+//
+// It is the same configuration as a ProviderConfig, for the managed resources
+// that live in the cluster scoped group: the ones managing state that belongs to
+// a whole Zitadel instance rather than to a namespace. Those objects cannot name
+// a namespaced secret, so the credential secret lives here alongside them.
+//
+// A namespaced resource may reference one of these too, which is the way to
+// share a single configuration across namespaces.
+type ClusterProviderConfig struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   ClusterProviderConfigSpec   `json:"spec"`
+	Status ClusterProviderConfigStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+// ClusterProviderConfigList contains a list of ClusterProviderConfig
+type ClusterProviderConfigList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ClusterProviderConfig `json:"items"`
+}
+
+// +kubebuilder:object:root=true
+
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="CONFIG-NAME",type="string",JSONPath=".providerConfigRef.name"
+// +kubebuilder:printcolumn:name="RESOURCE-KIND",type="string",JSONPath=".resourceRef.kind"
+// +kubebuilder:printcolumn:name="RESOURCE-NAME",type="string",JSONPath=".resourceRef.name"
+// +kubebuilder:resource:scope=Cluster,categories={crossplane,provider,zitadel}
+// A ClusterProviderConfigUsage indicates that a resource is using a
+// ClusterProviderConfig.
+type ClusterProviderConfigUsage struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	xpv2.TypedProviderConfigUsage `json:",inline"`
+}
+
+// +kubebuilder:object:root=true
+
+// ClusterProviderConfigUsageList contains a list of ClusterProviderConfigUsage
+type ClusterProviderConfigUsageList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ClusterProviderConfigUsage `json:"items"`
+}

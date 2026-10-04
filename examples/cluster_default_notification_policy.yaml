@@ -1,0 +1,20 @@
+# An example of a ClusterDefaultNotificationPolicy.
+#
+# This is the cluster scoped form of DefaultNotificationPolicy. The namespaced kind is kept and
+# behaves identically; use whichever suits the cluster.
+#
+# It manages the notification policy of any organization.
+#
+# It is the instance default, so it exists once however it is scoped.
+#
+# A cluster scoped resource cannot name a secret in a namespace, so it
+# references a ClusterProviderConfig, whose credential references say which
+# namespace their secret is in.
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ClusterDefaultNotificationPolicy
+metadata:
+  name: cluster-default-notification-policy
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    passwordChange: true

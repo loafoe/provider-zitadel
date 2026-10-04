@@ -1,0 +1,30 @@
+# An example of a ClusterDefaultLabelPolicy.
+#
+# This is the cluster scoped form of DefaultLabelPolicy. The namespaced kind is kept and
+# behaves identically; use whichever suits the cluster.
+#
+# It manages the theme an organization inherits for its login pages.
+#
+# It is the instance default, so it exists once however it is scoped.
+#
+# A cluster scoped resource cannot name a secret in a namespace, so it
+# references a ClusterProviderConfig, whose credential references say which
+# namespace their secret is in.
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ClusterDefaultLabelPolicy
+metadata:
+  name: cluster-default-label-policy
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    primaryColor: "#5282C1"
+    warnColor: "#F4A300"
+    backgroundColor: "#FFFFFF"
+    fontColor: "#1A1A1A"
+    hideLoginNameSuffix: false
+    disableWatermark: true
+    themeMode: "Auto"
+
+# The logo, favicon and custom font are uploaded to Zitadel outside its
+# API, so this provider reports where they are served from but never
+# sets or removes them. Their URLs appear in status.atProvider.

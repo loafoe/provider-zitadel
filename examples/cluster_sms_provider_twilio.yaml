@@ -1,0 +1,30 @@
+# An example of a ClusterSMSProviderTwilio.
+#
+# This is the cluster scoped form of SMSProviderTwilio. The namespaced kind is kept and
+# behaves identically; use whichever suits the cluster.
+#
+# It manages the Twilio account Zitadel sends SMS through.
+#
+# Zitadel sends through one of these, so two namespaced copies would
+# be fighting over the same provider.
+#
+# A cluster scoped resource cannot name a secret in a namespace, so it
+# references a ClusterProviderConfig, whose credential references say which
+# namespace their secret is in.
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ClusterSMSProviderTwilio
+metadata:
+  name: cluster-sms-provider-twilio
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ClusterProviderConfig
+  forProvider:
+    sid: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    # The token is a secret, and Zitadel sets it through a call of its own and
+    # never returns it.
+    tokenSecretRef:
+      name: zitadel-twilio
+      key: token
+    senderNumber: "+441234567890"
+    description: "The instance wide SMS provider"

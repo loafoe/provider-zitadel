@@ -443,7 +443,12 @@ func (e *activeWebKeyExternal) key(ctx context.Context, cr *v1alpha1.ActiveWebKe
 		return recorded, nil
 	}
 
-	return common.ResolveWebKeyID(ctx, e.kube, cr, &fp.WebKeyRef, &fp.WebKeySelector, fp.WebKeyID)
+	// The reference and the selector are values rather than pointers, so an
+	// unset one is not nil. Passing the empty value on would send the resolver
+	// looking for a WebKey with no name in no namespace, rather than falling
+	// through to the identifier.
+	return common.ResolveWebKeyID(ctx, e.kube, cr,
+		refOrNil(fp.WebKeyRef), selOrNil(fp.WebKeySelector), fp.WebKeyID)
 }
 
 // The four messaging providers
@@ -967,6 +972,24 @@ func (smsHTTPDriver) State(mg resource.Managed) string {
 	}
 
 	return providerState(cr.Spec.ForProvider.State)
+}
+
+// refOrNil and selOrNil turn an unset reference or selector into nil, which is
+// how the resolver is told to fall through to the plain identifier.
+func refOrNil(r xpv1.Reference) *xpv1.Reference {
+	if r.Name == "" {
+		return nil
+	}
+
+	return &r
+}
+
+func selOrNil(s xpv1.Selector) *xpv1.Selector {
+	if s.MatchLabels == nil && s.MatchControllerRef == nil {
+		return nil
+	}
+
+	return &s
 }
 
 // ofKind keeps only the providers of one kind.

@@ -619,6 +619,42 @@ Natural next steps, roughly in the order they tend to be needed:
 * `NotificationProvider` and `PasswordComplexity` — the rest of the organization
   settings.
 
+### Scoped resources
+
+Every managed resource has a namespaced form, and so does every one that also
+has a cluster scoped form. **Neither is deprecated and neither replaces the
+other.** Use whichever suits the cluster.
+
+The cluster scoped kinds live in `zitadel.crossplane.io` beside `ProviderConfig`,
+which is the Crossplane v2 convention: `*.m.crossplane.io` for namespaced managed
+resources, the bare group for cluster scoped ones.
+
+There is one test for which kinds get both, and it is worth stating because it is
+what stops the answer from being "all of them":
+
+> **Can Zitadel hold two of them?**
+
+| | |
+| --- | --- |
+| **Yes** — `Organization`, `HumanUser`, `Project`, `OIDCApplication`, the 11 instance `IDP*` kinds, `ActionTarget`, `WebKey`, `InstanceCustomDomain`, `ActionExecution*`, `InstanceMember` and the rest | A namespace is how you separate them: by team, by environment, by tenant. Cluster scoping them would only take that away, and avoid no conflict. **Namespaced only.** |
+| **No** — the 10 `Default*Policy` defaults, `InstanceFeatures`, `SystemFeatures`, `InstanceRestrictions`, `ActiveWebKey`, the 4 messaging providers | Two of them are the same settings, and the second writer wins. Cluster scoping makes that conflict unrepresentable. **Both.** |
+
+The 19 kinds with both are `ClusterInstanceFeatures`, `ClusterSystemFeatures`,
+`ClusterInstanceRestrictions`, `ClusterInstanceSecretGenerator`,
+`ClusterActiveWebKey`, `ClusterDefault{Lockout,Notification,PasswordAge,PasswordComplexity,Privacy,Domain,Label,Login,OIDCSettings,SecuritySettings}Policy`,
+`ClusterDefaultOIDCSettings` and `Cluster{EmailProviderSMTP,EmailProviderHTTP,SMSProviderTwilio,SMSProviderHTTP}`.
+
+**None of it is a second implementation.** Each cluster scoped kind is reconciled
+by the controller that already reconciles the namespaced one: the resource is
+handed to it as the kind it mirrors, and the external name, finalizers and status
+it produces are copied back. The spec, the observation and the status are one set
+of Go types, so there is no second definition of what a field means.
+
+A cluster scoped resource cannot name a secret in a namespace, so it references a
+**`ClusterProviderConfig`**, whose credential references say which namespace their
+secret is in. A namespaced resource may reference one too, which is the way to
+share a single configuration across namespaces.
+
 ### Coverage against the Terraform provider
 
 The official Zitadel Terraform provider registers **89** managed resources. This
@@ -644,6 +680,7 @@ modelling is missing, so the figures cannot drift away from it. It reports
 | Terraform provider resources | 89 |
 | Modelled here, one for one | 80 |
 | Deliberately not modelled | 9 |
+| Managed resource kinds here | 100, of which 19 are cluster scoped variants |
 
 Two of the eighty are ours in a way the Terraform provider's are not: a v2
 application is split here into `ApplicationAPI` and `OIDCApplication`, because

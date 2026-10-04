@@ -259,3 +259,51 @@ func TestExpiryIsComparedByMeaningNotBySpelling(t *testing.T) {
 		})
 	}
 }
+
+// A reset is invisible to a value: Zitadel reports the defaults with the same
+// shape as a set value, so the only way to tell that a deletion has taken effect
+// is whether it is still applying them.
+//
+// This is the bug this covers: the inherited answer was hardcoded to false, so a
+// reset looked identical to a set policy, and deleting an InstanceFeatures left
+// the finalizer waiting for an external resource that was already gone. It was
+// found on the live instance, on the cluster scoped kind, and applies to the
+// namespaced one too.
+// The inherited answer is observed, never desired, so it must not be compared.
+//
+// This is the bug this covers: the driver's inherited answer was hardcoded to
+// false, so a reset looked identical to a set value, and deleting an
+// InstanceFeatures left the finalizer waiting for an external resource that was
+// already gone. Found on the live instance, on the cluster scoped kind, and it
+// applies to the namespaced one too.
+func TestTheInheritedAnswerIsObservedOnly(t *testing.T) {
+	d := featuresDriver{instance: true}
+
+	// The flags a manifest asks for carry no inherited answer: it is something
+	// Zitadel reports, never something a manifest says. So a difference in it
+	// alone is not drift.
+	want := zitadel.FeatureFlags{LoginDefaultOrg: true, UserSchema: false}
+
+	observed := want
+	observed.Inherited = true
+
+	if !d.Equal(want, observed) {
+		t.Error("an inherited-only difference reported as drift, which would never settle")
+	}
+
+	if d.Equal(want, zitadel.FeatureFlags{LoginDefaultOrg: false, Inherited: true}) != false {
+		t.Error("a changed flag reported as up to date")
+	}
+}
+
+// The flags are resettable, so deleting one is a real deletion rather than a
+// restore, and Observe can tell a finished reset from a set value.
+func TestFeatureFlagsAreResettableSoDeletionCompletes(t *testing.T) {
+	if !(featuresDriver{instance: true}).Resettable() {
+		t.Error("the instance feature flags reported as not resettable; Zitadel can reset them")
+	}
+
+	if !(featuresDriver{}).Resettable() {
+		t.Error("the system feature flags reported as not resettable; Zitadel can reset them")
+	}
+}

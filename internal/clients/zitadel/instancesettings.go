@@ -53,6 +53,15 @@ type FeatureFlags struct {
 
 	// ImprovedPerformance lists the execution paths Zitadel may shortcut.
 	ImprovedPerformance []string
+
+	// Inherited reports that Zitadel is not applying any of these to the
+	// instance: the values are the defaults it falls back to.
+	//
+	// It is what tells a deletion that its reset has taken effect. Without it a
+	// reset looks the same as a set value, and the resource waits forever for an
+	// external resource that is already gone - which is how a namespaced
+	// InstanceFeatures ended up stuck on deletion.
+	Inherited bool
 }
 
 // Input returns the flags in the shape the write API accepts.
@@ -109,15 +118,26 @@ func (c *Client) GetInstanceFeatures(ctx context.Context) (*FeatureFlags, error)
 	out := &FeatureFlags{
 		ImprovedPerformance: make([]string, 0, len(resp.GetImprovedPerformance().GetExecutionPaths())),
 	}
+
+	// Zitadel reports where each flag's value came from. Anything that did not
+	// come from this instance is one it is not applying, and a scope that has
+	// been reset looks exactly like that.
+	inherited := true
+
 	if f := resp.GetLoginDefaultOrg(); f != nil {
 		out.LoginDefaultOrg = f.GetEnabled()
+		inherited = inherited && f.GetSource() != feature.Source_SOURCE_INSTANCE
 	}
 	if f := resp.GetUserSchema(); f != nil {
 		out.UserSchema = f.GetEnabled()
+		inherited = inherited && f.GetSource() != feature.Source_SOURCE_INSTANCE
 	}
 	if f := resp.GetDebugOidcParentError(); f != nil {
 		out.DebugOidcParentError = f.GetEnabled()
+		inherited = inherited && f.GetSource() != feature.Source_SOURCE_INSTANCE
 	}
+
+	out.Inherited = inherited
 	for _, p := range resp.GetImprovedPerformance().GetExecutionPaths() {
 		// ZITADEL sends the enum as a number, so converting it straight to a
 		// string would yield the character with that code point rather than the
@@ -167,12 +187,15 @@ func (c *Client) GetSystemFeatures(ctx context.Context) (*FeatureFlags, error) {
 		return nil, err
 	}
 
-	out := &FeatureFlags{}
+	out := &FeatureFlags{Inherited: true}
+
 	if f := resp.GetLoginDefaultOrg(); f != nil {
 		out.LoginDefaultOrg = f.GetEnabled()
+		out.Inherited = out.Inherited && f.GetSource() != feature.Source_SOURCE_INSTANCE
 	}
 	if f := resp.GetUserSchema(); f != nil {
 		out.UserSchema = f.GetEnabled()
+		out.Inherited = out.Inherited && f.GetSource() != feature.Source_SOURCE_INSTANCE
 	}
 
 	return out, nil

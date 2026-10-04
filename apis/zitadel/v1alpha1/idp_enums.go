@@ -129,6 +129,14 @@ type SecretKeySelector struct {
 	// +kubebuilder:validation:Required
 	// +required
 	Key string `json:"key"`
+
+	// Namespace of the secret.
+	//
+	// A namespaced resource leaves this empty and the secret is read from the
+	// resource's own namespace. A cluster scoped resource has no namespace to
+	// fall back on, so it must say here which namespace the secret is in.
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // IDPObservation is what Zitadel reports about an identity provider.

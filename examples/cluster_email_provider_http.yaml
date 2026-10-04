@@ -1,0 +1,26 @@
+# An example of a ClusterEmailProviderHTTP.
+#
+# This is the cluster scoped form of EmailProviderHTTP. The namespaced kind is kept and
+# behaves identically; use whichever suits the cluster.
+#
+# It manages the endpoint Zitadel posts email to.
+#
+# Zitadel sends through one of these, so two namespaced copies would
+# be fighting over the same provider.
+#
+# A cluster scoped resource cannot name a secret in a namespace, so it
+# references a ClusterProviderConfig, whose credential references say which
+# namespace their secret is in.
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ClusterEmailProviderHTTP
+metadata:
+  name: cluster-email-provider-http
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ClusterProviderConfig
+  forProvider:
+    # Receives the same payload Zitadel would hand an SMTP server, so the
+    # endpoint has to understand it.
+    endpoint: "https://email.example.com/send"
+    description: "The instance wide email provider"

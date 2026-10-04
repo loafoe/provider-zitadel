@@ -26,6 +26,7 @@ import (
 	"github.com/loafoe/provider-zitadel/internal/controller/actiontarget"
 	"github.com/loafoe/provider-zitadel/internal/controller/actiontargetpublickey"
 	"github.com/loafoe/provider-zitadel/internal/controller/apiapplication"
+	"github.com/loafoe/provider-zitadel/internal/controller/cluster"
 	"github.com/loafoe/provider-zitadel/internal/controller/config"
 	"github.com/loafoe/provider-zitadel/internal/controller/default_domain_policy"
 	"github.com/loafoe/provider-zitadel/internal/controller/default_label_policy"
@@ -72,6 +73,7 @@ import (
 func Setup(mgr ctrl.Manager, o controller.Options) error {
 	for _, setup := range []func(ctrl.Manager, controller.Options) error{
 		config.Setup,
+		cluster.Setup,
 
 		// Tenancy: the organization itself and who administers it.
 		organization.Setup,

@@ -1,0 +1,34 @@
+# An example of a ClusterInstanceFeatures.
+#
+# This is the cluster scoped form of InstanceFeatures. The namespaced kind is kept and
+# behaves identically; use whichever suits the cluster.
+#
+# It manages the feature flags of the whole instance.
+#
+# It is the singleton of the instance, so two namespaced copies
+# would be asking for the same flags and the second would win.
+#
+# A cluster scoped resource cannot name a secret in a namespace, so it
+# references a ClusterProviderConfig, whose credential references say which
+# namespace their secret is in.
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ClusterInstanceFeatures
+metadata:
+  name: cluster-instance-features
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ClusterProviderConfig
+  forProvider:
+    # The login screen falls back to the default organization rather than to the
+    # organization's own settings when no organization context is set.
+    loginDefaultOrg: true
+    # The user schema API is early and may change between Zitadel releases.
+    userSchema: false
+    # Returns the underlying error to an OIDC client. It can reveal details about
+    # the system, so it is off unless it is being used to debug something.
+    debugOidcParentError: false
+    # Execution paths Zitadel may shortcut in exchange for less work on write.
+    improvedPerformance:
+      - IMPROVED_PERFORMANCE_PROJECT
+      - IMPROVED_PERFORMANCE_USER_GRANT

@@ -1,0 +1,39 @@
+# An example of a ClusterEmailProviderSMTP.
+#
+# This is the cluster scoped form of EmailProviderSMTP. The namespaced kind is kept and
+# behaves identically; use whichever suits the cluster.
+#
+# It manages the SMTP server Zitadel sends email through.
+#
+# Zitadel sends through one of these, so two namespaced copies would
+# be fighting over the same provider.
+#
+# A cluster scoped resource cannot name a secret in a namespace, so it
+# references a ClusterProviderConfig, whose credential references say which
+# namespace their secret is in.
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ClusterEmailProviderSMTP
+metadata:
+  name: cluster-email-provider-smtp
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ClusterProviderConfig
+  forProvider:
+    # host:port. Zitadel does not connect when the provider is added, only when
+    # something is sent, so this can be set up ahead of a server that is not
+    # reachable yet.
+    host: "smtp.example.com:587"
+    user: "zitadel@example.com"
+    # The password is a secret rather than a field, so it is not readable by
+    # anyone who can read this object. Zitadel never returns it, so it is applied
+    # and then left alone.
+    passwordSecretRef:
+      name: zitadel-smtp
+      key: password
+    senderAddress: "noreply@example.com"
+    senderName: "Example"
+    # Zitadel calls this tls rather than starttls: it means the connection is
+    # wrapped from the start, which is what port 465 expects.
+    tls: true
+    description: "The instance wide email provider"

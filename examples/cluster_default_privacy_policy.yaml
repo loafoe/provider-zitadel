@@ -1,0 +1,23 @@
+# An example of a ClusterDefaultPrivacyPolicy.
+#
+# This is the cluster scoped form of DefaultPrivacyPolicy. The namespaced kind is kept and
+# behaves identically; use whichever suits the cluster.
+#
+# It manages the legal and support links an organization inherits.
+#
+# It is the instance default, so it exists once however it is scoped.
+#
+# A cluster scoped resource cannot name a secret in a namespace, so it
+# references a ClusterProviderConfig, whose credential references say which
+# namespace their secret is in.
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ClusterDefaultPrivacyPolicy
+metadata:
+  name: cluster-default-privacy-policy
+spec:
+  providerConfigRef: {name: zitadel, kind: ProviderConfig}
+  forProvider:
+    tosLink: "https://example.com/tos"
+    privacyLink: "https://example.com/privacy"
+    helpLink: "https://example.com/help"
+    supportEmail: "support@example.com"

@@ -1,0 +1,30 @@
+# An example of a ClusterInstanceRestrictions.
+#
+# This is the cluster scoped form of InstanceRestrictions. The namespaced kind is kept and
+# behaves identically; use whichever suits the cluster.
+#
+# It manages what anyone may register on the instance.
+#
+# It is the singleton of the instance, so two namespaced copies
+# would be asking for the same restrictions and the second would win.
+#
+# A cluster scoped resource cannot name a secret in a namespace, so it
+# references a ClusterProviderConfig, whose credential references say which
+# namespace their secret is in.
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ClusterInstanceRestrictions
+metadata:
+  name: cluster-instance-restrictions
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ClusterProviderConfig
+  forProvider:
+    # Off by default. Turning it off lets anyone sign up their own organization
+    # again, which is not usually what a manifest should say out loud.
+    disallowPublicOrgRegistration: true
+    # The languages the login screen offers. Empty means every language Zitadel
+    # supports.
+    allowedLanguages:
+      - en
+      - de

@@ -126,13 +126,15 @@ func (featuresDriver) Scope(_ context.Context, _ client.Client, _ common.Managed
 }
 
 func (d featuresDriver) Get(ctx context.Context, c *zitadel.Client, _ string) (zitadel.FeatureFlags, bool, error) {
+	// The inherited answer is Zitadel's own, and it is what tells a deletion that
+	// its reset has taken effect: a reset looks exactly like a set value otherwise.
 	if d.instance {
 		f, err := c.GetInstanceFeatures(ctx)
 		if err != nil {
 			return zitadel.FeatureFlags{}, false, err
 		}
 
-		return *f, false, nil
+		return *f, f.Inherited, nil
 	}
 
 	f, err := c.GetSystemFeatures(ctx)
@@ -140,7 +142,7 @@ func (d featuresDriver) Get(ctx context.Context, c *zitadel.Client, _ string) (z
 		return zitadel.FeatureFlags{}, false, err
 	}
 
-	return *f, false, nil
+	return *f, f.Inherited, nil
 }
 
 func (d featuresDriver) Apply(ctx context.Context, c *zitadel.Client, _ string, want zitadel.FeatureFlags) error {

@@ -687,6 +687,13 @@ func SecretValue(ctx context.Context, kube client.Client, ns string, ref *v1alph
 		return ""
 	}
 
+	// The reference may name its own namespace. A cluster scoped resource must:
+	// it has no namespace of its own to fall back on. A namespaced one leaves it
+	// empty and gets the secret from where it lives.
+	if ref.Namespace != "" {
+		ns = ref.Namespace
+	}
+
 	s := &corev1.Secret{}
 	if err := kube.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: ns}, s); err != nil {
 		return ""

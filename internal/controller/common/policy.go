@@ -357,7 +357,15 @@ func SetupPolicyController[P, O any, CR ManagedPolicy](mgr ctrl.Manager, o contr
 	d PolicyDriver[P, O],
 ) error {
 	return SetupManagedResourceController(mgr, o, groupKind, gvk, obj, list,
-		func(_ context.Context, kube client.Client, mg resource.ModernManaged, zc *zitadel.Client) (managed.ExternalClient, error) {
-			return newPolicyExternal[P, O, CR](kube, zc, mg, d)
-		})
+		PolicyExternalFactory[P, O, CR](d))
+}
+
+// PolicyExternalFactory returns the client factory for a policy driver.
+//
+// It is exported so that the namespaced and the cluster scoped setup of one kind
+// are built from the same thing rather than from two that could drift apart.
+func PolicyExternalFactory[P, O any, CR ManagedPolicy](d PolicyDriver[P, O]) NewExternalClientFn {
+	return func(_ context.Context, kube client.Client, mg resource.ModernManaged, zc *zitadel.Client) (managed.ExternalClient, error) {
+		return newPolicyExternal[P, O, CR](kube, zc, mg, d)
+	}
 }

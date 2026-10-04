@@ -1,0 +1,24 @@
+# An example of a ClusterSystemFeatures.
+#
+# This is the cluster scoped form of SystemFeatures. The namespaced kind is kept and
+# behaves identically; use whichever suits the cluster.
+#
+# It manages the system wide feature flags.
+#
+# It is the singleton of the instance, so two namespaced copies
+# would be asking for the same flags and the second would win.
+#
+# A cluster scoped resource cannot name a secret in a namespace, so it
+# references a ClusterProviderConfig, whose credential references say which
+# namespace their secret is in.
+apiVersion: zitadel.crossplane.io/v1alpha1
+kind: ClusterSystemFeatures
+metadata:
+  name: cluster-system-features
+spec:
+  providerConfigRef:
+    name: zitadel
+    kind: ClusterProviderConfig
+  forProvider:
+    loginDefaultOrg: true
+    userSchema: false
