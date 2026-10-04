@@ -319,8 +319,8 @@ TYPES = {
             # The document itself, so the example works without Zitadel being able
             # to reach an identity provider first.
             ("metadata", "|" + "\n      " + """<?xml version="1.0"?>
-<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata"
-                  entityID="https://idp.example.com"/>"""),
+      <EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata"
+                        entityID="https://idp.example.com"/>"""),
             ("binding", '"POST"'),
             ("nameIDFormat", '"EmailAddress"'),
         ],

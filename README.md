@@ -11,12 +11,13 @@ readable Go controller per managed resource, and it uses the modern Zitadel
 
 | | |
 |---|---|
-| Provider package | `ghcr.io/loafoe/provider-zitadel` (multi-arch, cosigned) |
-| Managed resource group | `zitadel.m.crossplane.io/v1alpha1` |
-| Provider config group | `zitadel.crossplane.io/v1alpha1` |
-| Platforms | `linux/amd64`, `linux/arm64` (multi-arch OCI image) |
-| Zitadel versions | 4.x (the `*/v2` gRPC APIs) |
-| Crossplane | v2 (namespaced managed resources) |
+| Provider package | `ghcr.io/loafoe/provider-zitadel` — multi-arch, cosigned |
+| Managed resources | **80** namespaced kinds, plus **19** cluster scoped variants |
+| Namespaced group | `zitadel.m.crossplane.io/v1alpha1` |
+| Cluster scoped group | `zitadel.crossplane.io/v1alpha1` (with `ClusterProviderConfig`) |
+| Platforms | `linux/amd64`, `linux/arm64` |
+| Zitadel | 4.x, over its `*/v2` gRPC APIs |
+| Crossplane | v2 |
 
 ## Managed resources
 
@@ -501,26 +502,46 @@ an image cannot share a tag. The multi-arch property holds end to end: the packa
 index has one entry per platform, each embedding that platform's controller
 image.
 
-### The GHCR package must belong to the repository
+### If the install fails
 
-A workflow's `GITHUB_TOKEN` may only push to a GHCR package that is **associated
-with the repository the workflow runs in**. The association is established by the
+`crossplane xpkg install provider ghcr.io/loafoe/provider-zitadel:<tag>` pulls a
+package that embeds its own controller image, so it needs one thing from the
+registry: read access to a **public** package.
+
+| Symptom | Check |
+| --- | --- |
+| `unauthorized` or `denied` pulling the package | It is private. Packages here default to public; if you have made one private, make it public again in [package settings](https://github.com/packages?package_type=container). |
+| The package is missing entirely | There is no release for that tag yet. `gh release list` shows what has been published; a `v*` tag produces one. |
+| Signature verification fails | Only relevant with `signatureVerification` enabled — see below. |
+| `no matching manifest for linux/arm64` | You are on an architecture the package does not cover, or on an older `crossplane` CLI that cannot read a multi-arch index. |
+
+Verify what is actually published before suspecting the install:
+
+```console
+hack/verify-multiarch.sh ghcr.io/loafoe/provider-zitadel:v0.1.0
+```
+
+### For maintainers: the GHCR package has to belong to the repository
+
+This only matters when publishing, not when installing.
+
+A workflow's `GITHUB_TOKEN` may only push to a GHCR package **associated with the
+repository the workflow runs in**. The association comes from the
 `org.opencontainers.image.source` label on an image pushed from that repository,
-which `make publish` does first by publishing the labelled controller image.
+which `make publish` sets by publishing the labelled controller image first.
 
-If the package exists but was created from somewhere else — for example pushed
-from a laptop with a personal token — the token is refused with
-`denied: permission_denied: read_package` before the label is ever looked at.
-The fix is one action, in
-[GitHub's package settings](https://github.com/packages?package_type=container):
-**delete `provider-zitadel`**, and let the next run recreate it. The first push
-from the repository associates the package with it and, because this account
-defaults to public package visibility, makes it public in one go.
+If the package already exists but was created elsewhere — for example pushed from
+a laptop with a personal token — the token is refused with
+`denied: permission_denied: read_package` before the label is ever read. The fix
+is one action: **delete `provider-zitadel`** in
+[GitHub's package settings](https://github.com/packages?package_type=container)
+and let the next run recreate it. The first push from the repository associates
+it and, since this account defaults to public visibility, makes it public.
 
-While the package is in that state, `ci.yml` reports the failed publish as a
-warning annotation and the run stays green — a branch build is not the place to
-enforce a one time owner action. `release.yml` keeps the step strict, so a tagged
-release fails loudly until the package is set up.
+While it is in that state `ci.yml` reports the failed publish as a warning and
+stays green: a branch build is not the place to enforce a one time owner action.
+`release.yml` keeps the step strict, so a tagged release fails loudly until the
+package is set up.
 
 ### Checking the multi-arch property yourself
 
@@ -611,13 +632,57 @@ asserts that Zitadel accepts a token obtained from a machine key.
 
 ## Roadmap
 
-Phase 2 added the authorization, credential and settings kinds listed above.
-Natural next steps, roughly in the order they tend to be needed:
+Where this is now: **every resource the Terraform provider is worth modelling,
+plus a cluster scoped form of the nineteen instance wide singletons.** What is
+left is not a list of kinds — it is the work that would let more of them be
+proven rather than merely wired.
 
-* `OrgIDP` / `IDP` — upstream identity providers.
-* `Action` / `ActionTarget` — login customisation.
-* `NotificationProvider` and `PasswordComplexity` — the rest of the organization
-  settings.
+### Proving the kinds that cannot be exercised
+
+Most kinds were run end to end against a live instance. These were not, and the
+reason is always the same: something outside Zitadel is needed and is not there.
+
+| Verified | How far |
+| --- | --- |
+| `OrgIDPJWT`, `OrgIDPOAuth` | Full lifecycle: created, read back, drifted, corrected, deleted |
+| `OrgIDPSAML`, `IDPGitHub`, `IDPAzureAD` | Created with real ZITADEL identifiers and deleted |
+| `OrgIDPLDAP`, `OrgIDPApple` | Reached ZITADEL and were refused on their own validation, which is as far as a bare instance goes |
+
+| Not proven | Why |
+| --- | --- |
+| The other **18** identity provider kinds | Each needs a real upstream to federate to. |
+| `EmailProviderHTTP`, `SMSProviderHTTP` | ZITADEL refuses an arbitrary endpoint with `Errors.NotificationProvider.Blocked.Endpoint` — an instance policy, not a wiring problem. |
+| `SystemFeatures`, `InstanceCustomDomain` | ZITADEL returns `PermissionDenied` for both even to an IAM owner, while reading them works. |
+
+That is 25 of the 80 capabilities whose write path is wired and reasoned about
+but whose full round trip has not been observed on this instance.
+
+The fix is a loopback identity provider — a small SAML, LDAP and OIDC server in a
+test fixture — which would turn "verified by construction" into "verified" for
+most of them. That is the highest value thing left, and it needs no new API work.
+
+### Zitadel capabilities the Terraform provider never modelled
+
+Parity is 100% of the Terraform surface, which is not the same as all of ZITADEL.
+These exist in the API and have no kind here at all, so they are additions rather
+than parity work:
+
+* **Quotas** — the system service takes `AddQuota`, `SetQuota` and `RemoveQuota`.
+  This is the nearest genuine gap: a real limit on an organisation that nothing can
+  manage today.
+* **Sessions** — listing and revoking sessions (`ListSessions`, `SetSession`,
+  `DeleteSession`), which is how you force a user to re-authenticate.
+* **Analytics** — `ReportBaseInformation` and `ReportResourceCounts`, read only.
+
+### Housekeeping
+
+* The two HTTP messaging providers above are the one thing a user is most likely
+  to want and least likely to be able to use, because it turns on an instance
+  policy. A kind that reported *why* an endpoint was refused, rather than only
+  surfacing Zitadel's error text, would be worth having.
+* `ActiveWebKey` and the settings kinds have no drift detection for the fields
+  ZITADEL does not return. That is a ZITADEL limitation rather than a gap here,
+  and it is documented where it applies.
 
 ### Scoped resources
 
