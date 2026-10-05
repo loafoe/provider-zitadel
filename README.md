@@ -630,6 +630,54 @@ make test
 `ZP_KEY` is the regression test for the API audience scope described above: it
 asserts that Zitadel accepts a token obtained from a machine key.
 
+#### What the unit suite covers, and what it cannot
+
+The unit suite covers the decisions rather than the wire: what a controller calls
+drift, what it sends for a field the manifest left out, how it reads a Zitadel
+failure, and which call it picks for a policy write. That is deliberate — those
+are where the bugs have been.
+
+What it cannot cover is whether the requests it builds are ones Zitadel accepts,
+or whether a finalizer is released when Zitadel behaves as documented. That
+needs a real instance, and it is what the integration tests are for:
+
+```console
+make test-integration
+```
+
+That target runs `cluster/local/integration_tests.sh`, which creates a kind
+cluster, installs Crossplane and Zitadel, deploys the provider built from the
+working tree, applies a set of resources, waits for each to report ready and then
+deletes them again. The delete is half the test: a resource that becomes ready but
+never releases its finalizer is the failure it exists to catch.
+
+It needs `kind`, `kubectl`, `helm`, `docker` and `go` on the path, and on failure
+it prints the controller and Zitadel logs before deleting the cluster; set
+`KEEP_CLUSTER=true` to keep it and investigate.
+
+> **Not a CI gate yet.** The script has not been run end to end, so it is not
+> wired into CI. An unverified check that gates a release is worse than no
+> check: it either blocks every release on a bug in the harness or gets ignored.
+> It becomes a job once it has passed against a live instance.
+
+Coverage is published to codecov. `codecov.yml` pins a floor for the project so
+that deleting tests is caught, and a target for changed lines so that new code is
+held to a higher standard than the historical average.
+
+### Connections
+
+A Zitadel client opens **one** gRPC connection and shares it across all twelve
+ZITADEL services it wraps, because they are gRPC services on one endpoint and
+gRPC multiplexes concurrent RPCs over a single HTTP/2 connection.
+
+Clients are cached per ProviderConfig and shared, so every resource pointing at
+the same configuration shares one connection, one token source and one set of
+lazily created per-organization management clients. A rotated secret changes the
+cache key, so it produces a new client rather than a stale one. This matters at
+scale rather than in the abstract: a provider is polled continuously, so
+reconnecting everything every minute is the steady state, not an occasional
+event.
+
 ## Roadmap
 
 Where this is now: **every resource the Terraform provider is worth modelling,

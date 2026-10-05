@@ -108,32 +108,18 @@ func (driver) Report(mg common.ManagedPolicy, observed zitadel.DefaultSecuritySe
 // Equal reports whether the observed policy already matches the desired one.
 //
 // A field the operator left unset is not compared, so Zitadel's own defaults are
-// never fought over.
-func (driver) Equal(want zitadel.DefaultSecuritySettingsInput, observed zitadel.DefaultSecuritySettings) bool {
-	for _, f := range []struct {
-		name string
-		want bool
-		got  bool
-	}{
-		{"EnableImpersonation", want.EnableImpersonation, observed.EnableImpersonation},
-		{"EmbeddedIframe", want.EmbeddedIframe, observed.EmbeddedIframe},
-	} {
-		if f.want != f.got {
-			return false
-		}
-	}
+// never fought over. Every field here is optional in the CRD, which is what makes
+// that more than a convention: Desired turns an unset field into the zero value,
+// so comparing it would report drift on every poll for a manifest that never
+// asked for the field to be managed. See common.AllSetMatch.
+func (driver) Equal(cr common.ManagedPolicy, want zitadel.DefaultSecuritySettingsInput, observed zitadel.DefaultSecuritySettings) bool {
+	fp := cr.(*v1alpha1.DefaultSecuritySettings).Spec.ForProvider
 
-	for _, f := range []struct {
-		name string
-		want []string
-		got  []string
-	}{
-		{"AllowedOrigins", want.AllowedOrigins, observed.AllowedOrigins},
-	} {
-		if !common.EqualStringSlices(f.want, f.got) {
-			return false
-		}
-	}
-
-	return true
+	return common.AllSetMatch(
+		common.Match("EnableImpersonation", fp.EnableImpersonation != nil, want.EnableImpersonation, observed.EnableImpersonation),
+		common.Match("EmbeddedIframe", fp.EmbeddedIframe != nil, want.EmbeddedIframe, observed.EmbeddedIframe),
+	) &&
+		common.AllSetMatchLists(
+			common.MatchList("AllowedOrigins", fp.AllowedOrigins != nil, want.AllowedOrigins, observed.AllowedOrigins),
+		)
 }

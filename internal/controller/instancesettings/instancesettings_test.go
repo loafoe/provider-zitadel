@@ -25,25 +25,32 @@ import (
 	"github.com/loafoe/provider-zitadel/internal/controller/common"
 )
 
+// A value shared by the cases, named so that a case reads as a statement about
+// behaviour rather than about a repeated literal.
+const (
+	improvedPath = "IMPROVED_PERFORMANCE_PROJECT"
+)
+
 // The instance and system flag tables share two of their flags, so the same
 // driver serves both. Getting that wrong is silent: a SystemFeatures compared
 // against the instance table's fields would report drift on two flags Zitadel
 // never reports for it, and reconcile forever.
 func TestSystemFeaturesAreComparedAgainstTheirOwnFields(t *testing.T) {
 	d := featuresDriver{}
+	cr := fullSystemFeatures()
 
 	want := zitadel.FeatureFlags{LoginDefaultOrg: true, UserSchema: true}
 
-	if !d.Equal(want, zitadel.FeatureFlags{LoginDefaultOrg: true, UserSchema: true}) {
+	if !d.Equal(cr, want, zitadel.FeatureFlags{LoginDefaultOrg: true, UserSchema: true}) {
 		t.Error("matching system flags reported as drift")
 	}
 
-	if d.Equal(zitadel.FeatureFlags{LoginDefaultOrg: true, UserSchema: false},
+	if d.Equal(cr, zitadel.FeatureFlags{LoginDefaultOrg: true, UserSchema: false},
 		zitadel.FeatureFlags{LoginDefaultOrg: true, UserSchema: true}) {
 		t.Error("a changed userSchema reported as up to date")
 	}
 
-	if d.Equal(zitadel.FeatureFlags{LoginDefaultOrg: false, UserSchema: true},
+	if d.Equal(cr, zitadel.FeatureFlags{LoginDefaultOrg: false, UserSchema: true},
 		zitadel.FeatureFlags{LoginDefaultOrg: true, UserSchema: true}) {
 		t.Error("a changed loginDefaultOrg reported as up to date")
 	}
@@ -56,15 +63,15 @@ func TestSystemFeaturesAreComparedAgainstTheirOwnFields(t *testing.T) {
 		LoginDefaultOrg:      true,
 		UserSchema:           true,
 		DebugOidcParentError: true,
-		ImprovedPerformance:  []string{"IMPROVED_PERFORMANCE_PROJECT"},
+		ImprovedPerformance:  []string{improvedPath},
 	}
-	if !d.Equal(withExtras, zitadel.FeatureFlags{LoginDefaultOrg: true, UserSchema: true}) {
+	if !d.Equal(cr, withExtras, zitadel.FeatureFlags{LoginDefaultOrg: true, UserSchema: true}) {
 		t.Error("system flags reported as drift on fields the system table does not have")
 	}
 
 	// The instance table does report them, so a change there is real drift.
 	inst := featuresDriver{instance: true}
-	if inst.Equal(withExtras, zitadel.FeatureFlags{LoginDefaultOrg: true, UserSchema: true}) {
+	if inst.Equal(fullInstanceFeatures(), withExtras, zitadel.FeatureFlags{LoginDefaultOrg: true, UserSchema: true}) {
 		t.Error("an instance flag turned off and asked for reported as up to date")
 	}
 }
@@ -75,19 +82,21 @@ func TestSystemFeaturesAreComparedAgainstTheirOwnFields(t *testing.T) {
 func TestEmptyImprovedPerformanceIsNotDrift(t *testing.T) {
 	d := featuresDriver{instance: true}
 
-	if !d.Equal(zitadel.FeatureFlags{}, zitadel.FeatureFlags{ImprovedPerformance: []string{}}) {
+	// Nothing is managed, so nothing is compared: an unset list and an empty one
+	// are the same thing.
+	if !d.Equal(&v1alpha1.InstanceFeatures{}, zitadel.FeatureFlags{}, zitadel.FeatureFlags{ImprovedPerformance: []string{}}) {
 		t.Error("an unset list compared against an empty one reported as drift")
 	}
 
-	if !d.Equal(
-		zitadel.FeatureFlags{ImprovedPerformance: []string{"IMPROVED_PERFORMANCE_PROJECT"}},
-		zitadel.FeatureFlags{ImprovedPerformance: []string{"IMPROVED_PERFORMANCE_PROJECT"}},
+	if !d.Equal(fullInstanceFeatures(),
+		zitadel.FeatureFlags{ImprovedPerformance: []string{improvedPath}},
+		zitadel.FeatureFlags{ImprovedPerformance: []string{improvedPath}},
 	) {
 		t.Error("matching improved performance paths reported as drift")
 	}
 
-	if d.Equal(
-		zitadel.FeatureFlags{ImprovedPerformance: []string{"IMPROVED_PERFORMANCE_PROJECT"}},
+	if d.Equal(fullInstanceFeatures(),
+		zitadel.FeatureFlags{ImprovedPerformance: []string{improvedPath}},
 		zitadel.FeatureFlags{ImprovedPerformance: []string{"IMPROVED_PERFORMANCE_USER_GRANT"}},
 	) {
 		t.Error("a changed improved performance path reported as up to date")
@@ -106,15 +115,15 @@ func TestRestrictionsAreNotResettable(t *testing.T) {
 	d := restrictionsDriver{}
 	want := zitadel.Restrictions{DisallowPublicOrgRegistration: true, AllowedLanguages: []string{"en", "de"}}
 
-	if !d.Equal(want, zitadel.Restrictions{DisallowPublicOrgRegistration: true, AllowedLanguages: []string{"en", "de"}}) {
+	if !d.Equal(fullRestrictions(), want, zitadel.Restrictions{DisallowPublicOrgRegistration: true, AllowedLanguages: []string{"en", "de"}}) {
 		t.Error("matching restrictions reported as drift")
 	}
 
-	if d.Equal(want, zitadel.Restrictions{DisallowPublicOrgRegistration: false, AllowedLanguages: []string{"en", "de"}}) {
+	if d.Equal(fullRestrictions(), want, zitadel.Restrictions{DisallowPublicOrgRegistration: false, AllowedLanguages: []string{"en", "de"}}) {
 		t.Error("a lifted registration restriction reported as up to date")
 	}
 
-	if d.Equal(want, zitadel.Restrictions{DisallowPublicOrgRegistration: true, AllowedLanguages: []string{"en"}}) {
+	if d.Equal(fullRestrictions(), want, zitadel.Restrictions{DisallowPublicOrgRegistration: true, AllowedLanguages: []string{"en"}}) {
 		t.Error("a removed allowed language reported as up to date")
 	}
 }
@@ -162,25 +171,25 @@ func TestSecretGeneratorIsNotResettable(t *testing.T) {
 		IncludeDigits:       true,
 	}
 
-	if !d.Equal(want, want) {
+	if !d.Equal(fullGenerator(), want, want) {
 		t.Error("a generator that matches itself reported as drift")
 	}
 
 	changed := want
 	changed.Length = 8
-	if d.Equal(want, changed) {
+	if d.Equal(fullGenerator(), want, changed) {
 		t.Error("a changed length reported as up to date")
 	}
 
 	changed = want
 	changed.IncludeSymbols = true
-	if d.Equal(want, changed) {
+	if d.Equal(fullGenerator(), want, changed) {
 		t.Error("a changed character class reported as up to date")
 	}
 
 	changed = want
 	changed.Type = "SECRET_GENERATOR_TYPE_APP_SECRET"
-	if d.Equal(want, changed) {
+	if d.Equal(fullGenerator(), want, changed) {
 		t.Error("a changed generator type reported as up to date")
 	}
 }
@@ -231,6 +240,57 @@ func newSecretGenerator(generatorType string) *v1alpha1.InstanceSecretGenerator 
 	return cr
 }
 
+// A resource whose spec sets every field its driver manages. Equal needs the
+// managed resource as well as the two values, because whether a field counts as
+// drift depends on whether the manifest set it - see the tests below.
+func fullSystemFeatures() *v1alpha1.SystemFeatures {
+	cr := &v1alpha1.SystemFeatures{}
+	cr.Spec.ForProvider.LoginDefaultOrg = common.BoolPtr(true)
+	cr.Spec.ForProvider.UserSchema = common.BoolPtr(true)
+
+	return cr
+}
+
+func fullInstanceFeatures() *v1alpha1.InstanceFeatures {
+	cr := &v1alpha1.InstanceFeatures{}
+	cr.Spec.ForProvider.LoginDefaultOrg = common.BoolPtr(true)
+	cr.Spec.ForProvider.UserSchema = common.BoolPtr(true)
+	cr.Spec.ForProvider.DebugOidcParentError = common.BoolPtr(true)
+	cr.Spec.ForProvider.ImprovedPerformance = []string{improvedPath}
+
+	return cr
+}
+
+func fullRestrictions() *v1alpha1.InstanceRestrictions {
+	cr := &v1alpha1.InstanceRestrictions{}
+	cr.Spec.ForProvider.DisallowPublicOrgRegistration = common.BoolPtr(true)
+	cr.Spec.ForProvider.AllowedLanguages = []string{"en", "de"}
+
+	return cr
+}
+
+func fullGenerator() *v1alpha1.InstanceSecretGenerator {
+	cr := newSecretGenerator("SECRET_GENERATOR_TYPE_INIT_CODE")
+	cr.Spec.ForProvider.Length = common.Int64Ptr(6)
+	cr.Spec.ForProvider.Expiry = common.StringPtr("5m")
+	cr.Spec.ForProvider.IncludeLowerLetters = common.BoolPtr(true)
+	cr.Spec.ForProvider.IncludeUpperLetters = common.BoolPtr(false)
+	cr.Spec.ForProvider.IncludeDigits = common.BoolPtr(true)
+	cr.Spec.ForProvider.IncludeSymbols = common.BoolPtr(false)
+
+	return cr
+}
+
+// onlyLoginDefaultOrg manages exactly one flag, which is what the test around it
+// needs: a CR that managed more would make the flags it does not ask for look
+// like drift.
+func onlyLoginDefaultOrg() *v1alpha1.InstanceFeatures {
+	cr := &v1alpha1.InstanceFeatures{}
+	cr.Spec.ForProvider.LoginDefaultOrg = common.BoolPtr(true)
+
+	return cr
+}
+
 // Zitadel reads a duration back normalised: a manifest that says `5m` comes
 // back as `5m0s`. Compared as strings that is drift on every reconcile, and the
 // resource never settles.
@@ -253,7 +313,7 @@ func TestExpiryIsComparedByMeaningNotBySpelling(t *testing.T) {
 			w, o := base, base
 			w.Expiry, o.Expiry = tc.want, tc.observed
 
-			if got := d.Equal(w, o); got != tc.same {
+			if got := d.Equal(fullGenerator(), w, o); got != tc.same {
 				t.Errorf("Equal(%q, %q) = %t, want %t", tc.want, tc.observed, got, tc.same)
 			}
 		})
@@ -287,11 +347,11 @@ func TestTheInheritedAnswerIsObservedOnly(t *testing.T) {
 	observed := want
 	observed.Inherited = true
 
-	if !d.Equal(want, observed) {
+	if !d.Equal(onlyLoginDefaultOrg(), want, observed) {
 		t.Error("an inherited-only difference reported as drift, which would never settle")
 	}
 
-	if d.Equal(want, zitadel.FeatureFlags{LoginDefaultOrg: false, Inherited: true}) != false {
+	if d.Equal(onlyLoginDefaultOrg(), want, zitadel.FeatureFlags{LoginDefaultOrg: false, Inherited: true}) {
 		t.Error("a changed flag reported as up to date")
 	}
 }
@@ -305,5 +365,93 @@ func TestFeatureFlagsAreResettableSoDeletionCompletes(t *testing.T) {
 
 	if !(featuresDriver{}).Resettable() {
 		t.Error("the system feature flags reported as not resettable; Zitadel can reset them")
+	}
+}
+
+// An unset field is Zitadel's to decide.
+//
+// Desired turns an unset field into the zero value, so a driver that compared it
+// anyway would report drift on every poll against whatever Zitadel happens to
+// hold - for a field the manifest never mentioned. These are the three drivers
+// that have the shape, each with the field that matters most to it.
+func TestUnsetFieldsAreNotDrift(t *testing.T) {
+	cases := map[string]struct {
+		reason   string
+		cr       common.ManagedPolicy
+		observed any
+		equal    func(common.ManagedPolicy, any) bool
+	}{
+		"SystemFeatureFlags": {
+			reason: "The system table manages no flags, so nothing it reports can be drift",
+			cr:     &v1alpha1.SystemFeatures{},
+			observed: zitadel.FeatureFlags{
+				LoginDefaultOrg: true, UserSchema: true, DebugOidcParentError: true,
+				ImprovedPerformance: []string{improvedPath},
+			},
+			equal: func(cr common.ManagedPolicy, got any) bool {
+				var d featuresDriver
+
+				return d.Equal(cr, d.Desired(cr), got.(zitadel.FeatureFlags)) //nolint:forcetypeassert // the table pairs them.
+			},
+		},
+		"InstanceFeatureFlags": {
+			reason:   "The instance table manages no flags either",
+			cr:       &v1alpha1.InstanceFeatures{},
+			observed: zitadel.FeatureFlags{LoginDefaultOrg: true, UserSchema: true},
+			equal: func(cr common.ManagedPolicy, got any) bool {
+				d := featuresDriver{instance: true}
+
+				return d.Equal(cr, d.Desired(cr), got.(zitadel.FeatureFlags)) //nolint:forcetypeassert // the table pairs them.
+			},
+		},
+		"Restrictions": {
+			reason: "Unmanaged registration restrictions are not drift",
+			cr:     &v1alpha1.InstanceRestrictions{},
+			observed: zitadel.Restrictions{
+				DisallowPublicOrgRegistration: true, AllowedLanguages: []string{"en", "de"},
+			},
+			equal: func(cr common.ManagedPolicy, got any) bool {
+				var d restrictionsDriver
+
+				return d.Equal(cr, d.Desired(cr), got.(zitadel.Restrictions)) //nolint:forcetypeassert // the table pairs them.
+			},
+		},
+		"SecretGenerator": {
+			reason: "A generator that names only its type manages only that, and its own value",
+			cr:     newSecretGenerator("SECRET_GENERATOR_TYPE_INIT_CODE"),
+			observed: zitadel.SecretGenerator{
+				Type: "SECRET_GENERATOR_TYPE_INIT_CODE", Length: 12, Expiry: "1h",
+				IncludeLowerLetters: true, IncludeUpperLetters: true,
+				IncludeDigits: true, IncludeSymbols: true,
+			},
+			equal: func(cr common.ManagedPolicy, got any) bool {
+				var d secretGeneratorDriver
+
+				return d.Equal(cr, d.Desired(cr), got.(zitadel.SecretGenerator)) //nolint:forcetypeassert // the table pairs them.
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if tc.equal(tc.cr, tc.observed) {
+				return
+			}
+
+			t.Errorf("\n%s\nEqual(...): a resource that manages no optional field reported drift", tc.reason)
+		})
+	}
+}
+
+// The generator type is the exception to "an unset field is not compared": it is
+// the resource's identity and its scope, so a generator of one type is never the
+// desired state of another, managed or not.
+func TestSecretGeneratorTypeIsAlwaysCompared(t *testing.T) {
+	cr := newSecretGenerator("SECRET_GENERATOR_TYPE_INIT_CODE")
+
+	observed := zitadel.SecretGenerator{Type: "SECRET_GENERATOR_TYPE_APP_SECRET"}
+
+	if (secretGeneratorDriver{}).Equal(cr, zitadel.SecretGenerator{}, observed) {
+		t.Error("Equal(...): a generator of a different type was reported as up to date")
 	}
 }

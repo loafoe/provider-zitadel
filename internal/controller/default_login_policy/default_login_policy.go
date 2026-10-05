@@ -143,70 +143,36 @@ func (driver) Report(mg common.ManagedPolicy, observed zitadel.DefaultLoginPolic
 // Equal reports whether the observed policy already matches the desired one.
 //
 // A field the operator left unset is not compared, so Zitadel's own defaults are
-// never fought over.
-func (driver) Equal(want zitadel.DefaultLoginPolicyInput, observed zitadel.DefaultLoginPolicy) bool {
-	for _, f := range []struct {
-		name string
-		want bool
-		got  bool
-	}{
-		{"AllowUsernamePassword", want.AllowUsernamePassword, observed.AllowUsernamePassword},
-		{"AllowRegister", want.AllowRegister, observed.AllowRegister},
-		{"AllowExternalIDP", want.AllowExternalIDP, observed.AllowExternalIDP},
-		{"ForceMFA", want.ForceMFA, observed.ForceMFA},
-		{"ForceMFALocalOnly", want.ForceMFALocalOnly, observed.ForceMFALocalOnly},
-		{"HidePasswordReset", want.HidePasswordReset, observed.HidePasswordReset},
-		{"IgnoreUnknownUsernames", want.IgnoreUnknownUsernames, observed.IgnoreUnknownUsernames},
-		{"AllowDomainDiscovery", want.AllowDomainDiscovery, observed.AllowDomainDiscovery},
-		{"DisableLoginWithEmail", want.DisableLoginWithEmail, observed.DisableLoginWithEmail},
-		{"DisableLoginWithPhone", want.DisableLoginWithPhone, observed.DisableLoginWithPhone},
-	} {
-		if f.want != f.got {
-			return false
-		}
-	}
+// never fought over. Every field here is optional in the CRD, which is what makes
+// that more than a convention: Desired turns an unset field into the zero value,
+// so comparing it would report drift on every poll for a manifest that never
+// asked for the field to be managed. See common.AllSetMatch.
+func (driver) Equal(cr common.ManagedPolicy, want zitadel.DefaultLoginPolicyInput, observed zitadel.DefaultLoginPolicy) bool {
+	fp := cr.(*v1alpha1.DefaultLoginPolicy).Spec.ForProvider
 
-	for _, f := range []struct {
-		name string
-		want string
-		got  string
-	}{
-		{"PasswordlessType", want.PasswordlessType, observed.PasswordlessType},
-	} {
-		if f.want != f.got {
-			return false
-		}
-	}
-
-	for _, f := range []struct {
-		name string
-		want string
-		got  string
-	}{
-		{"DefaultRedirectURI", want.DefaultRedirectURI, observed.DefaultRedirectURI},
-		{"PasswordCheckLifetime", want.PasswordCheckLifetime, observed.PasswordCheckLifetime},
-		{"ExternalLoginCheckLifetime", want.ExternalLoginCheckLifetime, observed.ExternalLoginCheckLifetime},
-		{"MFAInitSkipLifetime", want.MFAInitSkipLifetime, observed.MFAInitSkipLifetime},
-		{"SecondFactorCheckLifetime", want.SecondFactorCheckLifetime, observed.SecondFactorCheckLifetime},
-		{"MultiFactorCheckLifetime", want.MultiFactorCheckLifetime, observed.MultiFactorCheckLifetime},
-	} {
-		if f.want != f.got {
-			return false
-		}
-	}
-
-	for _, f := range []struct {
-		name string
-		want []string
-		got  []string
-	}{
-		{"SecondFactors", want.SecondFactors, observed.SecondFactors},
-		{"MultiFactors", want.MultiFactors, observed.MultiFactors},
-	} {
-		if !common.EqualStringSlices(f.want, f.got) {
-			return false
-		}
-	}
-
-	return true
+	return common.AllSetMatch(
+		common.Match("AllowUsernamePassword", fp.AllowUsernamePassword != nil, want.AllowUsernamePassword, observed.AllowUsernamePassword),
+		common.Match("AllowRegister", fp.AllowRegister != nil, want.AllowRegister, observed.AllowRegister),
+		common.Match("AllowExternalIDP", fp.AllowExternalIDP != nil, want.AllowExternalIDP, observed.AllowExternalIDP),
+		common.Match("ForceMFA", fp.ForceMFA != nil, want.ForceMFA, observed.ForceMFA),
+		common.Match("ForceMFALocalOnly", fp.ForceMFALocalOnly != nil, want.ForceMFALocalOnly, observed.ForceMFALocalOnly),
+		common.Match("HidePasswordReset", fp.HidePasswordReset != nil, want.HidePasswordReset, observed.HidePasswordReset),
+		common.Match("IgnoreUnknownUsernames", fp.IgnoreUnknownUsernames != nil, want.IgnoreUnknownUsernames, observed.IgnoreUnknownUsernames),
+		common.Match("AllowDomainDiscovery", fp.AllowDomainDiscovery != nil, want.AllowDomainDiscovery, observed.AllowDomainDiscovery),
+		common.Match("DisableLoginWithEmail", fp.DisableLoginWithEmail != nil, want.DisableLoginWithEmail, observed.DisableLoginWithEmail),
+		common.Match("DisableLoginWithPhone", fp.DisableLoginWithPhone != nil, want.DisableLoginWithPhone, observed.DisableLoginWithPhone),
+	) &&
+		common.AllSetMatch(
+			common.Match("PasswordlessType", fp.PasswordlessType != nil, want.PasswordlessType, observed.PasswordlessType),
+			common.Match("DefaultRedirectURI", fp.DefaultRedirectURI != nil, want.DefaultRedirectURI, observed.DefaultRedirectURI),
+			common.Match("PasswordCheckLifetime", fp.PasswordCheckLifetime != nil, want.PasswordCheckLifetime, observed.PasswordCheckLifetime),
+			common.Match("ExternalLoginCheckLifetime", fp.ExternalLoginCheckLifetime != nil, want.ExternalLoginCheckLifetime, observed.ExternalLoginCheckLifetime),
+			common.Match("MFAInitSkipLifetime", fp.MFAInitSkipLifetime != nil, want.MFAInitSkipLifetime, observed.MFAInitSkipLifetime),
+			common.Match("SecondFactorCheckLifetime", fp.SecondFactorCheckLifetime != nil, want.SecondFactorCheckLifetime, observed.SecondFactorCheckLifetime),
+			common.Match("MultiFactorCheckLifetime", fp.MultiFactorCheckLifetime != nil, want.MultiFactorCheckLifetime, observed.MultiFactorCheckLifetime),
+		) &&
+		common.AllSetMatchLists(
+			common.MatchList("SecondFactors", fp.SecondFactors != nil, want.SecondFactors, observed.SecondFactors),
+			common.MatchList("MultiFactors", fp.MultiFactors != nil, want.MultiFactors, observed.MultiFactors),
+		)
 }

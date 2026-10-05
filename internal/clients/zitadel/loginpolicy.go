@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"slices"
 	"sort"
-	"time"
 
 	managementv1 "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/management"
 	policyv1 "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/policy"
@@ -571,15 +570,20 @@ func durationString(d *durationpb.Duration) string {
 //
 // An empty string means "leave it alone" and is passed on as an absent duration,
 // which is what keeps an unset lifetime from being written as an explicit zero.
+//
+// Anything unparseable - including a negative duration, which Zitadel would
+// reject - is dropped rather than sent, the same way a missing field is. The
+// parsing goes through ParseDuration so that this and the exported helper cannot
+// disagree about what counts as a duration.
 func durationProto(s string) *durationpb.Duration {
 	if s == "" {
 		return nil
 	}
 
-	d, err := time.ParseDuration(s)
+	d, err := ParseDuration(s)
 	if err != nil {
 		return nil
 	}
 
-	return durationpb.New(d)
+	return d
 }

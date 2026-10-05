@@ -158,51 +158,28 @@ func (driver) Report(mg common.ManagedPolicy, observed zitadel.LabelPolicy) {
 // Equal reports whether the observed policy already matches the desired one.
 //
 // A field the operator left unset is not compared, so Zitadel's own defaults are
-// never fought over.
-func (driver) Equal(want zitadel.LabelPolicyInput, observed zitadel.LabelPolicy) bool {
-	for _, f := range []struct {
-		name string
-		want bool
-		got  bool
-	}{
-		{"HideLoginNameSuffix", want.HideLoginNameSuffix, observed.HideLoginNameSuffix},
-		{"DisableWatermark", want.DisableWatermark, observed.DisableWatermark},
-	} {
-		if f.want != f.got {
-			return false
-		}
-	}
+// never fought over. Every field here is optional in the CRD, which is what makes
+// that more than a convention: Desired turns an unset field into the zero value,
+// so comparing it would report drift on every poll for a manifest that never
+// asked for the field to be managed. See common.AllSetMatch.
+func (driver) Equal(cr common.ManagedPolicy, want zitadel.LabelPolicyInput, observed zitadel.LabelPolicy) bool {
+	fp := cr.(*v1alpha1.LabelPolicy).Spec.ForProvider
 
-	for _, f := range []struct {
-		name string
-		want string
-		got  string
-	}{
-		{"ThemeMode", want.ThemeMode, observed.ThemeMode},
-	} {
-		if f.want != f.got {
-			return false
-		}
-	}
-
-	for _, f := range []struct {
-		name string
-		want string
-		got  string
-	}{
-		{"PrimaryColor", want.PrimaryColor, observed.PrimaryColor},
-		{"WarnColor", want.WarnColor, observed.WarnColor},
-		{"BackgroundColor", want.BackgroundColor, observed.BackgroundColor},
-		{"FontColor", want.FontColor, observed.FontColor},
-		{"PrimaryColorDark", want.PrimaryColorDark, observed.PrimaryColorDark},
-		{"WarnColorDark", want.WarnColorDark, observed.WarnColorDark},
-		{"BackgroundColorDark", want.BackgroundColorDark, observed.BackgroundColorDark},
-		{"FontColorDark", want.FontColorDark, observed.FontColorDark},
-	} {
-		if f.want != f.got {
-			return false
-		}
-	}
-
-	return true
+	return common.AllSetMatch(
+		common.Match("HideLoginNameSuffix", fp.HideLoginNameSuffix != nil, want.HideLoginNameSuffix, observed.HideLoginNameSuffix),
+		common.Match("DisableWatermark", fp.DisableWatermark != nil, want.DisableWatermark, observed.DisableWatermark),
+	) &&
+		common.AllSetMatch(
+			common.Match("ThemeMode", fp.ThemeMode != nil, want.ThemeMode, observed.ThemeMode),
+		) &&
+		common.AllSetMatch(
+			common.Match("PrimaryColor", fp.PrimaryColor != nil, want.PrimaryColor, observed.PrimaryColor),
+			common.Match("WarnColor", fp.WarnColor != nil, want.WarnColor, observed.WarnColor),
+			common.Match("BackgroundColor", fp.BackgroundColor != nil, want.BackgroundColor, observed.BackgroundColor),
+			common.Match("FontColor", fp.FontColor != nil, want.FontColor, observed.FontColor),
+			common.Match("PrimaryColorDark", fp.PrimaryColorDark != nil, want.PrimaryColorDark, observed.PrimaryColorDark),
+			common.Match("WarnColorDark", fp.WarnColorDark != nil, want.WarnColorDark, observed.WarnColorDark),
+			common.Match("BackgroundColorDark", fp.BackgroundColorDark != nil, want.BackgroundColorDark, observed.BackgroundColorDark),
+			common.Match("FontColorDark", fp.FontColorDark != nil, want.FontColorDark, observed.FontColorDark),
+		)
 }

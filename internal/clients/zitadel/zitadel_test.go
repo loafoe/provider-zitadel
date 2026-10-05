@@ -28,6 +28,19 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+// Values the cases share, named so that a case reads as a statement about
+// behaviour rather than about a repeated literal.
+const (
+	userActive   = "Active"
+	userInactive = "Inactive"
+)
+
+// Test values, named so that a case reads as a statement about behaviour
+// rather than about a repeated string.
+const (
+	garbage = "Nope"
+)
+
 func TestIsNotFound(t *testing.T) {
 	cases := map[string]struct {
 		reason string
@@ -205,11 +218,11 @@ func TestUserStateToProto(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		"Empty":  {reason: "An empty state defaults to active", state: "", want: "USER_STATE_ACTIVE"},
-		"Active": {reason: "Active maps to active", state: "Active", want: "USER_STATE_ACTIVE"},
-		"Inactive": {
+		"Empty":    {reason: "An empty state defaults to active", state: "", want: "USER_STATE_ACTIVE"},
+		userActive: {reason: "Active maps to active", state: userActive, want: "USER_STATE_ACTIVE"},
+		userInactive: {
 			reason: "Inactive maps to inactive",
-			state:  "Inactive",
+			state:  userInactive,
 			want:   "USER_STATE_INACTIVE",
 		},
 		"Locked": {reason: "Locked maps to locked", state: "Locked", want: "USER_STATE_LOCKED"},
@@ -218,7 +231,7 @@ func TestUserStateToProto(t *testing.T) {
 			state:  "Initial",
 			want:   "USER_STATE_INITIAL",
 		},
-		"Unknown": {reason: "An unknown state is rejected", state: "Nope", wantErr: true},
+		"Unknown": {reason: "An unknown state is rejected", state: garbage, wantErr: true},
 	}
 
 	for name, tc := range cases {
@@ -235,7 +248,7 @@ func TestUserStateToProto(t *testing.T) {
 }
 
 func TestUserStateRoundTrip(t *testing.T) {
-	states := []string{"Active", "Inactive", "Locked", "Initial"}
+	states := []string{userActive, userInactive, "Locked", "Initial"}
 	for _, want := range states {
 		t.Run(want, func(t *testing.T) {
 			p, err := UserStateToProto(want)

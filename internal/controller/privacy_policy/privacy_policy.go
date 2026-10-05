@@ -142,25 +142,20 @@ func (driver) Report(mg common.ManagedPolicy, observed zitadel.PrivacyPolicy) {
 // Equal reports whether the observed policy already matches the desired one.
 //
 // A field the operator left unset is not compared, so Zitadel's own defaults are
-// never fought over.
-func (driver) Equal(want zitadel.PrivacyPolicyInput, observed zitadel.PrivacyPolicy) bool {
-	for _, f := range []struct {
-		name string
-		want string
-		got  string
-	}{
-		{"TOSLink", want.TOSLink, observed.TOSLink},
-		{"PrivacyLink", want.PrivacyLink, observed.PrivacyLink},
-		{"HelpLink", want.HelpLink, observed.HelpLink},
-		{"SupportEmail", want.SupportEmail, observed.SupportEmail},
-		{"DocsLink", want.DocsLink, observed.DocsLink},
-		{"CustomLink", want.CustomLink, observed.CustomLink},
-		{"CustomLinkText", want.CustomLinkText, observed.CustomLinkText},
-	} {
-		if f.want != f.got {
-			return false
-		}
-	}
+// never fought over. Every field here is optional in the CRD, which is what makes
+// that more than a convention: Desired turns an unset field into the zero value,
+// so comparing it would report drift on every poll for a manifest that never
+// asked for the field to be managed. See common.AllSetMatch.
+func (driver) Equal(cr common.ManagedPolicy, want zitadel.PrivacyPolicyInput, observed zitadel.PrivacyPolicy) bool {
+	fp := cr.(*v1alpha1.PrivacyPolicy).Spec.ForProvider
 
-	return true
+	return common.AllSetMatch(
+		common.Match("TOSLink", fp.TOSLink != nil, want.TOSLink, observed.TOSLink),
+		common.Match("PrivacyLink", fp.PrivacyLink != nil, want.PrivacyLink, observed.PrivacyLink),
+		common.Match("HelpLink", fp.HelpLink != nil, want.HelpLink, observed.HelpLink),
+		common.Match("SupportEmail", fp.SupportEmail != nil, want.SupportEmail, observed.SupportEmail),
+		common.Match("DocsLink", fp.DocsLink != nil, want.DocsLink, observed.DocsLink),
+		common.Match("CustomLink", fp.CustomLink != nil, want.CustomLink, observed.CustomLink),
+		common.Match("CustomLinkText", fp.CustomLinkText != nil, want.CustomLinkText, observed.CustomLinkText),
+	)
 }

@@ -83,7 +83,10 @@ func (d *testDriver) Desired(_ ManagedPolicy) zitadel.LockoutPolicyInput {
 
 func (d *testDriver) Report(_ ManagedPolicy, _ zitadel.LockoutPolicy) {}
 
-func (d *testDriver) Equal(want zitadel.LockoutPolicyInput, got zitadel.LockoutPolicy) bool {
+// Equal takes the managed resource too, because a policy driver cannot tell an
+// unset field from one that was asked to be zero without looking at the spec.
+// The test driver ignores it: it compares the values outright.
+func (d *testDriver) Equal(_ ManagedPolicy, want zitadel.LockoutPolicyInput, got zitadel.LockoutPolicy) bool {
 	return want.MaxPasswordAttempts == got.MaxPasswordAttempts
 }
 

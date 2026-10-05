@@ -18,7 +18,6 @@ package common
 
 import (
 	"context"
-	stderrors "errors"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/event"
@@ -52,12 +51,20 @@ type connector struct {
 	// everything using it.
 	clusterUsage *resource.ProviderConfigUsageTracker
 
+	// cache shares one Zitadel client between every resource that authenticates
+	// with the same configuration. Without it each reconcile would dial a fresh
+	// connection and a fresh token, and throw them away again; see ClientCache.
+	cache *ClientCache
+
 	newExternal NewExternalClientFn
 }
 
 // Connect tracks the ProviderConfig usage of mg, builds an authenticated
 // Zitadel client and hands both to the controller specific external client
 // factory.
+//
+// The client is shared and outlives this call, so the external client is given
+// one it must Release rather than Close. See ClientCache.
 func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
 	m, ok := mg.(resource.ModernManaged)
 	if !ok {
@@ -68,16 +75,16 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 		return nil, errors.Wrap(err, "cannot track ProviderConfig usage")
 	}
 
-	zc, err := NewClientFromProviderConfig(ctx, c.kube, m)
+	zc, err := c.cache.ClientFor(ctx, c.kube, m)
 	if err != nil {
 		return nil, err
 	}
 
 	ec, err := c.newExternal(ctx, c.kube, m, zc)
 	if err != nil {
-		if cerr := zc.Close(); cerr != nil {
-			return nil, stderrors.Join(zitadel.WrapError(err), cerr)
-		}
+		// The client is the cache's, so releasing here is a no-op for it. It
+		// matters only for a client built outside the cache.
+		zc.Release()
 
 		return nil, zitadel.WrapError(err)
 	}
@@ -133,14 +140,22 @@ func (c *externalClient) Delete(ctx context.Context, mg resource.Managed) (manag
 func SetupManagedResourceController(mgr ctrl.Manager, o controller.Options, groupKind string, gvk schema.GroupVersionKind, obj client.Object, list resource.ManagedList, newExternal NewExternalClientFn) error {
 	name := managed.ControllerName(groupKind)
 
+	// One cache for the whole provider, so that a resource, the organization it
+	// belongs to and the project that organization holds share a connection
+	// rather than opening one each. The manager owns its lifetime: the cache
+	// registers a shutdown hook once, however many kinds ask for it.
+	cache := DefaultClientCache()
+	if err := cache.Register(mgr); err != nil {
+		return errors.Wrap(err, "cannot register the Zitadel client cache")
+	}
+
 	opts := []managed.ReconcilerOption{
 		managed.WithExternalConnector(&connector{
-			kube: mgr.GetClient(),
-			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(),
-				&apisv1alpha1.ProviderConfigUsage{}),
-			clusterUsage: resource.NewProviderConfigUsageTracker(mgr.GetClient(),
-				&apisv1alpha1.ClusterProviderConfigUsage{}),
-			newExternal: newExternal,
+			kube:         mgr.GetClient(),
+			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
+			clusterUsage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ClusterProviderConfigUsage{}),
+			cache:        cache,
+			newExternal:  newExternal,
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),

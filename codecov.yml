@@ -1,0 +1,47 @@
+# Coverage policy for codecov.
+#
+# The provider has no integration coverage in the unit test suite - the requests
+# it sends can only be checked against a real Zitadel, which lives in
+# cluster/local/integration_tests.sh. What the unit suite can cover is the
+# decision logic: what a controller considers drift, what it sends for an unset
+# field, how it reads a Zitadel failure, and which call it picks for a policy
+# write. That is where the bugs have been, so that is what the numbers below
+# track.
+#
+# The thresholds are set below the current figures on purpose. They are a floor
+# that stops coverage being quietly removed, not a target to ratchet upwards in
+# one commit. The direction of travel is upwards; see the README for what is and
+# is not covered and why.
+
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  status:
+    project:
+      default:
+        # A floor, so a change that deletes tests is caught rather than merged.
+        target: auto
+        # 1% of headroom: codecov reports below the target on a drop smaller
+        # than this, which would turn ordinary churn into a red build.
+        threshold: 1%
+
+        informational: true
+    patch:
+      default:
+        # New code is held to the standard rather than the historical average.
+        target: 60%
+        threshold: 5%
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: true
+
+ignore:
+  # Generated code is checked for being up to date by the check-diff job in CI,
+  # and reviewing its coverage says nothing about the provider.
+  - "apis/**/zz_generated.*"
+  - "**/*.pb.go"
+  # The build submodule is not ours.
+  - "build/**"

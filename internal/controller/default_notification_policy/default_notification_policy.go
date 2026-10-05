@@ -104,19 +104,14 @@ func (driver) Report(mg common.ManagedPolicy, observed zitadel.DefaultNotificati
 // Equal reports whether the observed policy already matches the desired one.
 //
 // A field the operator left unset is not compared, so Zitadel's own defaults are
-// never fought over.
-func (driver) Equal(want zitadel.DefaultNotificationPolicyInput, observed zitadel.DefaultNotificationPolicy) bool {
-	for _, f := range []struct {
-		name string
-		want bool
-		got  bool
-	}{
-		{"PasswordChange", want.PasswordChange, observed.PasswordChange},
-	} {
-		if f.want != f.got {
-			return false
-		}
-	}
+// never fought over. Every field here is optional in the CRD, which is what makes
+// that more than a convention: Desired turns an unset field into the zero value,
+// so comparing it would report drift on every poll for a manifest that never
+// asked for the field to be managed. See common.AllSetMatch.
+func (driver) Equal(cr common.ManagedPolicy, want zitadel.DefaultNotificationPolicyInput, observed zitadel.DefaultNotificationPolicy) bool {
+	fp := cr.(*v1alpha1.DefaultNotificationPolicy).Spec.ForProvider
 
-	return true
+	return common.AllSetMatch(
+		common.Match("PasswordChange", fp.PasswordChange != nil, want.PasswordChange, observed.PasswordChange),
+	)
 }

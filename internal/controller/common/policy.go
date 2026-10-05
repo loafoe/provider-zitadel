@@ -132,12 +132,28 @@ type PolicyDriver[P, O any] interface {
 	Report(cr ManagedPolicy, observed O)
 
 	// Equal reports whether the observed policy already matches the desired one.
-	Equal(want P, got O) bool
+	//
+	// It takes the managed resource as well as the two values, because whether a
+	// field counts as drift depends on whether the manifest set it. Desired
+	// cannot express that on its own: it has to turn an unset field into
+	// something, and the something it picks is the zero value. Every field of
+	// every policy here is optional in the CRD, so without the managed resource
+	// a manifest that omits a field would be compared against Zitadel's own
+	// value for it and reported as drift on every poll, forever - fighting a
+	// value the operator never asked to have managed.
+	//
+	// An unset field is therefore not compared, so Zitadel's own defaults are
+	// never fought over.
+	Equal(cr ManagedPolicy, want P, got O) bool
 }
 
-// Disconnect releases the underlying Zitadel client.
+// Disconnect releases this reconcile's claim on the Zitadel client. The
+// client itself is usually shared and outlives the reconcile, so this is a
+// no-op unless the client is not owned by a cache.
 func (e *policyExternal[P, O, CR]) Disconnect(_ context.Context) error {
-	return e.zc.Close()
+	e.zc.Release()
+
+	return nil
 }
 
 // policyExternal reconciles one Zitadel policy.
@@ -217,7 +233,7 @@ func (e *policyExternal[P, O, CR]) Observe(ctx context.Context, mg resource.Mana
 
 	return managed.ExternalObservation{
 		ResourceExists:   exists,
-		ResourceUpToDate: e.d.Equal(e.d.Desired(cr), observed),
+		ResourceUpToDate: e.d.Equal(cr, e.d.Desired(cr), observed),
 	}, nil
 }
 

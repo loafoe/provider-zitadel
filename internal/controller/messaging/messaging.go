@@ -145,7 +145,11 @@ func newSAMLExternal(_ context.Context, kube client.Client, _ resource.ModernMan
 	return &samlExternal{kube: kube, client: zc}, nil
 }
 
-func (e *samlExternal) Disconnect(_ context.Context) error { return e.client.Close() }
+func (e *samlExternal) Disconnect(_ context.Context) error {
+	e.client.Release()
+
+	return nil
+}
 
 func (e *samlExternal) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.ApplicationSAML)
@@ -335,7 +339,11 @@ func newActiveWebKeyExternal(_ context.Context, kube client.Client, _ resource.M
 	return &activeWebKeyExternal{kube: kube, client: zc}, nil
 }
 
-func (e *activeWebKeyExternal) Disconnect(_ context.Context) error { return e.client.Close() }
+func (e *activeWebKeyExternal) Disconnect(_ context.Context) error {
+	e.client.Release()
+
+	return nil
+}
 
 func (e *activeWebKeyExternal) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.ActiveWebKey)
@@ -509,7 +517,11 @@ func newProviderExternal(d providerDriver) func(context.Context, client.Client, 
 	}
 }
 
-func (e *providerExternal) Disconnect(_ context.Context) error { return e.client.Close() }
+func (e *providerExternal) Disconnect(_ context.Context) error {
+	e.client.Release()
+
+	return nil
+}
 
 func (e *providerExternal) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	id := meta.GetExternalName(mg)

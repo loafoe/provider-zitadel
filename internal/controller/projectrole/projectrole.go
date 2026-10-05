@@ -193,9 +193,13 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 	return managed.ExternalDelete{}, nil
 }
 
-// Disconnect releases the underlying Zitadel client.
+// Disconnect releases this reconcile's claim on the Zitadel client. The
+// client itself is usually shared and outlives the reconcile, so this is a
+// no-op unless the client is not owned by a cache.
 func (e *external) Disconnect(ctx context.Context) error {
-	return e.client.Close()
+	e.client.Release()
+
+	return nil
 }
 
 // projectID resolves the project the role belongs to.

@@ -25,11 +25,15 @@ package zitadel
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	adminapi "github.com/zitadel/zitadel-go/v3/pkg/client/admin"
 	apiv2 "github.com/zitadel/zitadel-go/v3/pkg/client/application/v2"
@@ -47,9 +51,13 @@ import (
 	settingsapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/settings/v2"
 	webkeyapi "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/webkey/v2"
 	"golang.org/x/oauth2"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	adminapiadmin "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/admin"
+	applicationv2app "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/application/v2"
+	projectv2project "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/project/v2"
+	userv2user "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/user/v2"
 )
 
 // Scopes requested when authenticating with a service account key.
@@ -104,6 +112,11 @@ type Config struct {
 }
 
 // Client is a Zitadel API client.
+//
+// Every service it exposes shares a single gRPC connection and a single token
+// source. gRPC multiplexes concurrent RPCs over one HTTP/2 connection, so the
+// twelve ZITADEL surfaces this client wraps need one connection between them,
+// not one each. See NewClient.
 type Client struct {
 	user        *userv2.Client
 	project     *projectv2.Client
@@ -115,34 +128,27 @@ type Client struct {
 
 	// The v2 settings service is the only Zitadel surface that reads and writes
 	// the instance wide security settings.
-	settings     settingsapi.SettingsServiceClient
-	settingsConn *zitadel.Connection
-	actionConn   *zitadel.Connection
+	settings settingsapi.SettingsServiceClient
 
 	// The v2 feature service holds the instance and system wide feature flags,
 	// which are the only Zitadel surface that reads or writes them.
-	feature     featureapi.FeatureServiceClient
-	featureConn *zitadel.Connection
+	feature featureapi.FeatureServiceClient
 
 	// The v2 instance service holds the custom and trusted domain lists.
-	instance     instanceapi.InstanceServiceClient
-	instanceConn *zitadel.Connection
+	instance instanceapi.InstanceServiceClient
 
 	// The v2beta organization service holds the domains an organization owns.
 	// It is on a different service from the v2 organization client above, and is
 	// the only surface that can add, list and remove one.
-	orgDomain     orgv2api.OrganizationServiceClient
-	orgDomainConn *zitadel.Connection
+	orgDomain orgv2api.OrganizationServiceClient
 
 	// The v2 webkey service holds Zitadel's own signing keys, which are what an
 	// application verifies a token with.
-	webkey     webkeyapi.WebKeyServiceClient
-	webkeyConn *zitadel.Connection
+	webkey webkeyapi.WebKeyServiceClient
 
 	// The v2 internal permission service grants roles against a resource, which
 	// is how a project membership is written.
-	permission     permissionapi.InternalPermissionServiceClient
-	permissionConn *zitadel.Connection
+	permission permissionapi.InternalPermissionServiceClient
 
 	// The v1 admin API is the only API that manages instance memberships (IAM
 	// roles), instance settings and the domain policy. Most of it is instance
@@ -161,6 +167,25 @@ type Client struct {
 	options      []zitadel.Option
 	management   map[string]*management.Client
 	managementMu sync.Mutex
+
+	// conn is the one connection every service above shares, and the only one
+	// Close has to release.
+	conn *zitadel.Connection
+
+	// orgID is the default organization context of the configuration the client
+	// was built from, kept so that controllers can read it without a second read
+	// of the ProviderConfig.
+	orgID string
+
+	// shared is set on a client that a ClientCache owns. Such a client outlives
+	// the reconcile that obtained it, so Release must not close it.
+	shared bool
+
+	// closeOnce and closeErr make Close idempotent: closing a connection twice
+	// fails, and the cache that owns this client may have closed it already.
+	closeOnce sync.Once
+	closed    atomic.Bool
+	closeErr  error
 }
 
 // hostFromURL extracts the host (and optional port) from the supplied URL,
@@ -238,137 +263,63 @@ func endpoints(cfg Config) (issuer, api string, err error) {
 // NewClient creates a new Zitadel API client. The returned client opens gRPC
 // connections lazily; use Close to release them.
 //
-//nolint:gocyclo // one step per connection, each of which can fail.
+// NewClient creates a new Zitadel API client. The returned client opens a
+// single gRPC connection, shared by every service it exposes; use Close (or
+// Release, for a client owned by a ClientCache) to release it.
+//
+// The twelve ZITADEL surfaces are gRPC services on the same endpoint. The SDK
+// offers a convenience constructor per surface, but each of those dials its own
+// connection, and every one of them carries its own copy of the authentication
+// interceptor. A client built that way would pay twelve TLS handshakes and
+// twelve token exchanges for a reconcile that typically touches one or two of
+// the surfaces, and then throw all twelve away at the end of it. So the
+// connection is built once here and the service stubs are constructed from its
+// ClientConn, which is exactly what the convenience constructors do internally.
 func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 	issuer, api, err := endpoints(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	opts := connectionOptions(ctx, cfg, issuer, api)
-	scopes := defaultScopes()
-
-	// Every client that is built successfully is tracked, so that a later
-	// failure does not leak the connections opened so far.
-	var open []*grpc.ClientConn
-	closeAll := func() {
-		for _, c := range open {
-			_ = c.Close()
-		}
-	}
-
-	u, err := userv2.NewClient(ctx, issuer, api, scopes, opts...)
+	conn, err := zitadel.NewConnection(ctx, issuer, api, defaultScopes(), connectionOptions(ctx, cfg, issuer, api)...)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create zitadel user client: %w", err)
-	}
-	open = append(open, u.Connection.ClientConn)
-
-	p, err := projectv2.NewClient(ctx, issuer, api, scopes, opts...)
-	if err != nil {
-		closeAll()
-		return nil, fmt.Errorf("cannot create zitadel project client: %w", err)
-	}
-	open = append(open, p.Connection.ClientConn)
-
-	a, err := apiv2.NewClient(ctx, issuer, api, scopes, opts...)
-	if err != nil {
-		closeAll()
-		return nil, fmt.Errorf("cannot create zitadel application client: %w", err)
-	}
-	open = append(open, a.Connection.ClientConn)
-
-	o, err := orgv2.NewClient(ctx, issuer, api, scopes, opts...)
-	if err != nil {
-		closeAll()
-		return nil, fmt.Errorf("cannot create zitadel organization client: %w", err)
-	}
-	open = append(open, o.Connection.ClientConn)
-
-	ad, err := adminapi.NewClient(ctx, issuer, api, scopes, opts...)
-	if err != nil {
-		closeAll()
-		return nil, fmt.Errorf("cannot create zitadel admin client: %w", err)
-	}
-	open = append(open, ad.Connection.ClientConn)
-
-	// The action service is generated without a convenience constructor either.
-	actConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
-	if err != nil {
-		closeAll()
-		return nil, fmt.Errorf("cannot create zitadel action connection: %w", err)
+		return nil, fmt.Errorf("cannot connect to Zitadel at %s: %w", api, err)
 	}
 
-	act := actionapi.NewActionServiceClient(actConn.ClientConn)
-
-	// The settings service is generated without a convenience constructor, so it
-	// gets its own connection here rather than sharing one of the others'.
-	stConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
-	if err != nil {
-		closeAll()
-		return nil, fmt.Errorf("cannot create zitadel settings connection: %w", err)
-	}
-
-	st := settingsapi.NewSettingsServiceClient(stConn.ClientConn)
-
-	// The feature service is generated without a convenience constructor too.
-	ftConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
-	if err != nil {
-		closeAll()
-		return nil, fmt.Errorf("cannot create zitadel feature connection: %w", err)
-	}
-
-	ft := featureapi.NewFeatureServiceClient(ftConn.ClientConn)
-
-	// So are the instance and v2beta organization services, which the domain
-	// lists live on.
-	instConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
-	if err != nil {
-		closeAll()
-		return nil, fmt.Errorf("cannot create zitadel instance connection: %w", err)
-	}
-
-	orgDomConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
-	if err != nil {
-		closeAll()
-		return nil, fmt.Errorf("cannot create zitadel organization domain connection: %w", err)
-	}
-
-	wkConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
-	if err != nil {
-		closeAll()
-		return nil, fmt.Errorf("cannot create zitadel webkey connection: %w", err)
-	}
-
-	permConn, err := zitadel.NewConnection(ctx, issuer, api, scopes, opts...)
-	if err != nil {
-		closeAll()
-		return nil, fmt.Errorf("cannot create zitadel permission connection: %w", err)
-	}
+	cc := conn.ClientConn
 
 	return &Client{
-		user:           u,
-		project:        p,
-		application:    a,
-		org:            o,
-		admin:          ad,
-		action:         act,
-		actionConn:     actConn,
-		feature:        ft,
-		featureConn:    ftConn,
-		settings:       st,
-		settingsConn:   stConn,
-		instance:       instanceapi.NewInstanceServiceClient(instConn.ClientConn),
-		instanceConn:   instConn,
-		orgDomain:      orgv2api.NewOrganizationServiceClient(orgDomConn.ClientConn),
-		orgDomainConn:  orgDomConn,
-		webkey:         webkeyapi.NewWebKeyServiceClient(wkConn.ClientConn),
-		webkeyConn:     wkConn,
-		permission:     permissionapi.NewInternalPermissionServiceClient(permConn.ClientConn),
-		permissionConn: permConn,
-		issuer:         issuer,
-		api:            api,
-		options:        opts,
-		management:     map[string]*management.Client{},
+		conn:       conn,
+		issuer:     issuer,
+		api:        api,
+		orgID:      cfg.OrganizationID,
+		options:    connectionOptions(ctx, cfg, issuer, api),
+		management: map[string]*management.Client{},
+
+		// The convenience constructors below only wrap a service stub built from a
+		// connection, so they are spelled out rather than called: calling them is
+		// what dialed a connection per service in the first place.
+		user:        &userv2.Client{Connection: conn, UserServiceClient: userv2user.NewUserServiceClient(cc)},
+		project:     &projectv2.Client{Connection: conn, ProjectServiceClient: projectv2project.NewProjectServiceClient(cc)},
+		application: &apiv2.Client{Connection: conn, ApplicationServiceClient: applicationv2app.NewApplicationServiceClient(cc)},
+		org:         &orgv2.Client{Connection: conn, OrganizationServiceClient: orgv2api.NewOrganizationServiceClient(cc)},
+
+		// The v1 admin API is the only API that manages instance memberships (IAM
+		// roles), instance settings and the domain policy.
+		admin: &adminapi.Client{
+			Connection:         conn,
+			AdminServiceClient: adminapiadmin.NewAdminServiceClient(cc),
+		},
+
+		// The remaining v2 services are generated without a convenience
+		// constructor, so their stubs are built directly.
+		action:     actionapi.NewActionServiceClient(cc),
+		settings:   settingsapi.NewSettingsServiceClient(cc),
+		feature:    featureapi.NewFeatureServiceClient(cc),
+		instance:   instanceapi.NewInstanceServiceClient(cc),
+		orgDomain:  orgv2api.NewOrganizationServiceClient(cc),
+		webkey:     webkeyapi.NewWebKeyServiceClient(cc),
+		permission: permissionapi.NewInternalPermissionServiceClient(cc),
 	}, nil
 }
 
@@ -408,29 +359,123 @@ func connectionOptions(ctx context.Context, cfg Config, issuer, api string) []zi
 	))
 }
 
-// Close releases the gRPC connections held by the client.
+// Close releases the gRPC connections held by the client, including the
+// per organization management and admin clients it created lazily.
+//
+// The main connection is shared by every service, so one call to its Close is
+// all that is needed for them. The per organization clients carry their own
+// connection because the organization is applied as an interceptor at connect
+// time, so they are still one connection each - but they are created only on
+// demand and held until the client is closed.
+//
+// Close is idempotent. A client can be closed by the cache that owns it and then
+// closed again by a reconcile that was still holding it, and a second failure to
+// close an already closed connection would surface as a reconcile error that
+// says nothing useful.
 func (c *Client) Close() error {
-	var errs []error
+	c.closeOnce.Do(func() {
+		var errs []error
 
-	for _, conn := range []interface{ Close() error }{c.user.Connection, c.project.Connection, c.application.Connection, c.org.Connection, c.admin.Connection, c.settingsConn, c.actionConn, c.featureConn, c.instanceConn, c.orgDomainConn, c.webkeyConn, c.permissionConn} {
-		if conn == nil {
-			continue
+		if c.conn != nil {
+			if err := c.conn.Close(); err != nil {
+				errs = append(errs, err)
+			}
 		}
-		if err := conn.Close(); err != nil {
-			errs = append(errs, err)
+
+		c.adminMu.Lock()
+		for _, ac := range c.adminPerOrg {
+			if err := ac.Connection.Close(); err != nil {
+				errs = append(errs, err)
+			}
 		}
+		c.adminPerOrg = nil
+		c.adminMu.Unlock()
+
+		c.managementMu.Lock()
+		for _, mc := range c.management {
+			if err := mc.Connection.Close(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		c.management = nil
+		c.managementMu.Unlock()
+
+		c.closed.Store(true)
+		c.closeErr = errors.Join(errs...)
+	})
+
+	return c.closeErr
+}
+
+// Closed reports whether the client has been closed and can no longer be used.
+//
+// A client handed out by a ClientCache can be retired while a reconcile is
+// still holding it, so this is how a caller tells a live client from one it
+// must rebuild.
+func (c *Client) Closed() bool { return c.closed.Load() }
+
+// Release gives up the caller's claim on the client. Controllers call this
+// instead of Close, because a client may be shared: one obtained from a
+// ClientCache is reused across reconciles and is closed by the cache when the
+// provider shuts down, so closing it here would break every other resource
+// using the same configuration.
+//
+// For a client the caller owns, Release is exactly Close.
+func (c *Client) Release() {
+	if c.shared {
+		return
 	}
 
-	c.managementMu.Lock()
-	for _, mc := range c.management {
-		if err := mc.Connection.Close(); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	c.management = nil
-	c.managementMu.Unlock()
+	_ = c.Close()
+}
 
-	return errors.Join(errs...)
+// SetShared marks the client as owned by a cache, which makes Release a no-op.
+// It is called by ClientCache and is not part of the controller facing API.
+func (c *Client) SetShared() { c.shared = true }
+
+// DefaultOrganizationID reports the organization the ProviderConfig set as the
+// default context, or an empty string when it set none. Controllers that need
+// the default read it from here rather than fetching the ProviderConfig a
+// second time.
+func (c *Client) DefaultOrganizationID() string { return c.orgID }
+
+// Config.Key derives the identity of a configuration: two configurations that
+// produce the same key are interchangeable and can share one Client.
+//
+// The credentials are hashed rather than included, so a key can be logged or
+// compared without carrying secret material. A rotation of either credential
+// changes the key, which is what makes a cached client get rebuilt when the
+// secret behind it changes.
+func (c Config) Key() string {
+	h := sha256.New()
+
+	// Length prefixed, so that no two different configurations can be spelled
+	// the same by moving a separator between fields.
+	for _, part := range []string{
+		c.URL, c.OrganizationID,
+		strconv.FormatBool(c.Insecure),
+		strconv.FormatBool(c.InsecureSkipTLSVerify),
+	} {
+		_, _ = h.Write([]byte(strconv.Itoa(len(part))))
+		_, _ = h.Write([]byte{0})
+		_, _ = h.Write([]byte(part))
+	}
+
+	// The credentials decide which of the two authentication methods is used,
+	// and the token is trimmed exactly as connectionOptions trims it, so that a
+	// token differing only in surrounding whitespace shares a client.
+	switch {
+	case c.Credentials.Token != "":
+		_, _ = h.Write([]byte("token"))
+		_, _ = h.Write([]byte(strings.TrimSpace(c.Credentials.Token)))
+	case len(c.Credentials.ServiceAccountKey) > 0:
+		_, _ = h.Write([]byte("key"))
+		_, _ = h.Write(c.Credentials.ServiceAccountKey)
+	default:
+		_, _ = h.Write([]byte("none"))
+	}
+
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // IsNotFound reports whether err indicates that the external resource does not
@@ -551,13 +596,18 @@ const ErrInvalidTokenHint = "Zitadel rejected the credentials of the provider. "
 // WrapError enriches authentication failures with ErrInvalidTokenHint so that
 // the most common misconfiguration is actionable without reading the Zitadel
 // docs. Every other error is returned unchanged.
+//
+// The original error is wrapped rather than flattened into a new message. The
+// reconciler sees every error from every controller through this function, so
+// flattening would strip the gRPC status off every credential rejection - and
+// with it the ability to tell an authentication problem from any other error.
 func WrapError(err error) error {
 	if err == nil {
 		return nil
 	}
 
 	if IsInvalidToken(err) {
-		return errors.New(ErrInvalidTokenHint + ": " + err.Error())
+		return fmt.Errorf("%s: %w", ErrInvalidTokenHint, err)
 	}
 
 	return err

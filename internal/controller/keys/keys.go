@@ -107,7 +107,11 @@ func newWebKeyExternal(_ context.Context, _ client.Client, _ resource.ModernMana
 	return &webKeyExternal{client: zc}, nil
 }
 
-func (e *webKeyExternal) Disconnect(_ context.Context) error { return e.client.Close() }
+func (e *webKeyExternal) Disconnect(_ context.Context) error {
+	e.client.Release()
+
+	return nil
+}
 
 func (e *webKeyExternal) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.WebKey)
@@ -201,7 +205,11 @@ func newApplicationKeyExternal(_ context.Context, kube client.Client, _ resource
 	return &applicationKeyExternal{kube: kube, client: zc}, nil
 }
 
-func (e *applicationKeyExternal) Disconnect(ctx context.Context) error { return e.client.Close() }
+func (e *applicationKeyExternal) Disconnect(ctx context.Context) error {
+	e.client.Release()
+
+	return nil
+}
 
 func (e *applicationKeyExternal) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.ApplicationKey)
@@ -378,7 +386,11 @@ func newProjectMemberExternal(_ context.Context, kube client.Client, _ resource.
 	return &projectMemberExternal{kube: kube, client: zc}, nil
 }
 
-func (e *projectMemberExternal) Disconnect(ctx context.Context) error { return e.client.Close() }
+func (e *projectMemberExternal) Disconnect(ctx context.Context) error {
+	e.client.Release()
+
+	return nil
+}
 
 func (e *projectMemberExternal) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.ProjectMember)

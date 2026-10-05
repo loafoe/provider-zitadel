@@ -702,6 +702,15 @@ func (c *Client) GetDefaultOIDCSettings(ctx context.Context) (*DefaultOIDCSettin
 	}
 
 	o := resp.GetSettings()
+	if o == nil {
+		// A response with nothing in it is a missing policy, not a policy whose
+		// lifetimes are all empty. Reading the fields off a nil payload yields
+		// empty strings for every one of them, which the controller would then
+		// report as drift against the lifetimes the manifest asked for, on every
+		// poll, forever. The other seven instance policies guard for this and
+		// this one has to as well.
+		return nil, ErrNotFound
+	}
 
 	return &DefaultOIDCSettings{
 		AccessTokenLifetime:        durationString(o.GetAccessTokenLifetime()),

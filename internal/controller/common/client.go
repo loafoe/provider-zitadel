@@ -91,31 +91,13 @@ var (
 // the cluster, extracts its credentials and returns a ready to use Zitadel
 // client.
 //
-// The caller is responsible for closing the returned client.
+// The caller is responsible for closing the returned client. A reconcile that
+// runs more than once for the same configuration should use a ClientCache
+// instead, which shares one client between every caller that needs it.
 func NewClientFromProviderConfig(ctx context.Context, kube client.Client, mg resource.ModernManaged) (*zitadel.Client, error) {
-	if mg.GetProviderConfigReference() == nil {
-		return nil, errors.New("no provider config reference set")
-	}
-
-	ref := mg.GetProviderConfigReference()
-
-	// A cluster scoped resource cannot name a namespaced ProviderConfig, so it
-	// refers to a ClusterProviderConfig instead. A namespaced one may do either:
-	// a ProviderConfig of its own namespace, or a ClusterProviderConfig to share
-	// one configuration across namespaces.
-	settings, creds, err := providerConfig(ctx, kube, mg, ref)
+	cfg, err := ConfigForProviderConfig(ctx, kube, mg)
 	if err != nil {
 		return nil, err
-	}
-
-	cfg := zitadel.Config{
-		URL:                   settings.URL,
-		Credentials:           creds,
-		Insecure:              derefBool(settings.Insecure),
-		InsecureSkipTLSVerify: derefBool(settings.InsecureSkipTLSVerify),
-	}
-	if settings.OrganizationID != nil {
-		cfg.OrganizationID = *settings.OrganizationID
 	}
 
 	client, err := zitadel.NewClient(ctx, cfg)
@@ -126,56 +108,82 @@ func NewClientFromProviderConfig(ctx context.Context, kube client.Client, mg res
 	return client, nil
 }
 
-// providerConfigSpec reads whichever provider configuration the resource points
-// at, and returns the specification either kind carries.
+// providerResolution is the outcome of resolving a provider configuration
+// reference: the settings, and a way to read the credentials of whichever kind
+// the reference named.
 //
-// The two are the same type on purpose, so a cluster scoped resource and a
-// namespaced one authenticate through exactly the same rules and there is one
+// The credentials are behind a closure because the two kinds store them
+// differently - a namespaced configuration reads its secret from the
+// resource's own namespace, a cluster scoped one from a namespace the secret
+// reference names - while a caller that only needs the default organization has
+// no reason to read a secret at all.
+type providerResolution struct {
+	settings *providerSettings
+	creds    func(ctx context.Context, kube client.Client) (zitadel.Credentials, error)
+}
+
+// resolveProviderConfig reads whichever provider configuration a resource points
+// at, and returns its settings together with a reader for its credentials.
+//
+// This is the only place that decides what a providerConfigRef may name, so
+// every reader of a ProviderConfig accepts the same references. The two
+// readers used to disagree: building a client accepted a ClusterProviderConfig
+// while reading the default organization from it rejected the very same
+// reference, so a namespaced resource pointing at one authenticated fine and
+// then failed on the next call. Keeping the kind switch here is what stops that
+// from coming back.
+//
+// The two kinds are the same shape on purpose, so a cluster scoped resource and
+// a namespaced one authenticate through exactly the same rules and there is one
 // definition of what a Zitadel credential looks like.
-func providerConfig(ctx context.Context, kube client.Client, mg resource.ModernManaged,
+func resolveProviderConfig(ctx context.Context, kube client.Client, mg resource.ModernManaged,
 	ref *xpv1.ProviderConfigReference,
-) (*providerSettings, zitadel.Credentials, error) {
+) (*providerResolution, error) {
 	switch ref.Kind {
 	case "ClusterProviderConfig":
+		// A cluster scoped resource cannot name a namespaced ProviderConfig, so it
+		// refers to a ClusterProviderConfig instead. A namespaced one may do
+		// either: a ProviderConfig of its own namespace, or a ClusterProviderConfig
+		// to share one configuration across namespaces.
 		pc := &apisv1alpha1.ClusterProviderConfig{}
 		if err := kube.Get(ctx, types.NamespacedName{Name: ref.Name}, pc); err != nil {
-			return nil, zitadel.Credentials{}, errors.Wrap(err, ErrGetProviderConfig)
+			return nil, errors.Wrap(err, ErrGetProviderConfig)
 		}
 
-		// The secret names its own namespace: a cluster scoped configuration has
-		// no namespace of its own to look one up in.
-		creds, err := extractClusterCredentials(ctx, kube, pc.Spec.Credentials)
-		if err != nil {
-			return nil, zitadel.Credentials{}, err
-		}
-
-		return &providerSettings{
-			URL:                   pc.Spec.URL,
-			OrganizationID:        pc.Spec.OrganizationID,
-			Insecure:              pc.Spec.Insecure,
-			InsecureSkipTLSVerify: pc.Spec.InsecureSkipTLSVerify,
-		}, creds, nil
+		return &providerResolution{
+			settings: &providerSettings{
+				URL:                   pc.Spec.URL,
+				OrganizationID:        pc.Spec.OrganizationID,
+				Insecure:              pc.Spec.Insecure,
+				InsecureSkipTLSVerify: pc.Spec.InsecureSkipTLSVerify,
+			},
+			// The secret names its own namespace: a cluster scoped configuration
+			// has no namespace of its own to look one up in.
+			creds: func(ctx context.Context, kube client.Client) (zitadel.Credentials, error) {
+				return extractClusterCredentials(ctx, kube, pc.Spec.Credentials)
+			},
+		}, nil
 
 	case "", "ProviderConfig":
 		pc := &apisv1alpha1.ProviderConfig{}
 		if err := kube.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: mg.GetNamespace()}, pc); err != nil {
-			return nil, zitadel.Credentials{}, errors.Wrap(err, ErrGetProviderConfig)
+			return nil, errors.Wrap(err, ErrGetProviderConfig)
 		}
 
-		creds, err := extractCredentials(ctx, kube, mg.GetNamespace(), pc.Spec.Credentials)
-		if err != nil {
-			return nil, zitadel.Credentials{}, err
-		}
-
-		return &providerSettings{
-			URL:                   pc.Spec.URL,
-			OrganizationID:        pc.Spec.OrganizationID,
-			Insecure:              pc.Spec.Insecure,
-			InsecureSkipTLSVerify: pc.Spec.InsecureSkipTLSVerify,
-		}, creds, nil
+		return &providerResolution{
+			settings: &providerSettings{
+				URL:                   pc.Spec.URL,
+				OrganizationID:        pc.Spec.OrganizationID,
+				Insecure:              pc.Spec.Insecure,
+				InsecureSkipTLSVerify: pc.Spec.InsecureSkipTLSVerify,
+			},
+			creds: func(ctx context.Context, kube client.Client) (zitadel.Credentials, error) {
+				return extractCredentials(ctx, kube, mg.GetNamespace(), pc.Spec.Credentials)
+			},
+		}, nil
 
 	default:
-		return nil, zitadel.Credentials{}, errors.Wrapf(ErrUnsupportedProviderConfigKind, "%s", ref.Kind)
+		return nil, errors.Wrapf(ErrUnsupportedProviderConfigKind, "%s", ref.Kind)
 	}
 }
 
@@ -190,26 +198,26 @@ type providerSettings struct {
 
 // ProviderConfigOrganizationID returns the default organization ID configured
 // on the ProviderConfig of mg, or an empty string when unset.
+//
+// It accepts the same references as NewClientFromProviderConfig, including a
+// ClusterProviderConfig named by a namespaced resource. It used to reject those,
+// which meant a resource could build its client and then fail on this call: the
+// two readers disagreed about what a valid reference is.
 func ProviderConfigOrganizationID(ctx context.Context, kube client.Client, mg resource.ModernManaged) (string, error) {
 	if mg.GetProviderConfigReference() == nil {
 		return "", nil
 	}
 
-	ref := mg.GetProviderConfigReference()
-	if ref.Kind != "" && ref.Kind != "ProviderConfig" {
-		return "", errors.Wrapf(ErrUnsupportedProviderConfigKind, "%s", ref.Kind)
+	res, err := resolveProviderConfig(ctx, kube, mg, mg.GetProviderConfigReference())
+	if err != nil {
+		return "", err
 	}
 
-	pc := &apisv1alpha1.ProviderConfig{}
-	if err := kube.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: mg.GetNamespace()}, pc); err != nil {
-		return "", errors.Wrap(err, ErrGetProviderConfig)
-	}
-
-	if pc.Spec.OrganizationID == nil {
+	if res.settings.OrganizationID == nil {
 		return "", nil
 	}
 
-	return *pc.Spec.OrganizationID, nil
+	return *res.settings.OrganizationID, nil
 }
 
 // extractCredentials resolves the credentials of a ProviderConfig into the

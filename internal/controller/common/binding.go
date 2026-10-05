@@ -92,9 +92,13 @@ type bindingExternal[CR ManagedBinding, H any] struct {
 	d    BindingDriver[CR, H]
 }
 
-// Disconnect releases the underlying Zitadel client.
+// Disconnect releases this reconcile's claim on the Zitadel client. The
+// client itself is usually shared and outlives the reconcile, so this is a
+// no-op unless the client is not owned by a cache.
 func (e *bindingExternal[CR, H]) Disconnect(_ context.Context) error {
-	return e.zc.Close()
+	e.zc.Release()
+
+	return nil
 }
 
 func (e *bindingExternal[CR, H]) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {

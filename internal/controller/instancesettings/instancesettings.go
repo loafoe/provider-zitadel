@@ -209,15 +209,44 @@ func (featuresDriver) Report(mg common.ManagedPolicy, observed zitadel.FeatureFl
 //
 // The two kinds are compared against their own field sets: a SystemFeatures
 // observed value carries no improved performance paths, because Zitadel reports
-// none for that table.
-func (d featuresDriver) Equal(want zitadel.FeatureFlags, observed zitadel.FeatureFlags) bool {
-	if want.LoginDefaultOrg != observed.LoginDefaultOrg || want.UserSchema != observed.UserSchema {
-		return false
+// none for that table. A flag the manifest left unset is not compared at all,
+// because Desired turns it into false and Zitadel's own value for it is usually
+// not.
+func (d featuresDriver) Equal(cr common.ManagedPolicy, want zitadel.FeatureFlags, observed zitadel.FeatureFlags) bool {
+	var (
+		loginDefaultOrg, userSchema, debugParentError *bool
+		improvedPerformance                           []string
+	)
+
+	switch typed := cr.(type) {
+	case *v1alpha1.InstanceFeatures:
+		loginDefaultOrg = typed.Spec.ForProvider.LoginDefaultOrg
+		userSchema = typed.Spec.ForProvider.UserSchema
+		debugParentError = typed.Spec.ForProvider.DebugOidcParentError
+		improvedPerformance = typed.Spec.ForProvider.ImprovedPerformance
+
+	case *v1alpha1.SystemFeatures:
+		loginDefaultOrg = typed.Spec.ForProvider.LoginDefaultOrg
+		userSchema = typed.Spec.ForProvider.UserSchema
 	}
 
-	if d.instance {
-		return want.DebugOidcParentError == observed.DebugOidcParentError &&
-			common.EqualStringSlices(want.ImprovedPerformance, observed.ImprovedPerformance)
+	for _, f := range []struct {
+		name string
+		set  bool
+		want bool
+		got  bool
+	}{
+		{"LoginDefaultOrg", loginDefaultOrg != nil, want.LoginDefaultOrg, observed.LoginDefaultOrg},
+		{"UserSchema", userSchema != nil, want.UserSchema, observed.UserSchema},
+		{"DebugOidcParentError", debugParentError != nil, want.DebugOidcParentError, observed.DebugOidcParentError},
+	} {
+		if f.set && f.want != f.got {
+			return false
+		}
+	}
+
+	if d.instance && improvedPerformance != nil && !common.EqualStringSlices(improvedPerformance, observed.ImprovedPerformance) {
+		return false
 	}
 
 	return true
@@ -276,9 +305,22 @@ func (restrictionsDriver) Report(mg common.ManagedPolicy, observed zitadel.Restr
 	cr.Status.AtProvider.AllowedLanguages = observed.AllowedLanguages
 }
 
-func (restrictionsDriver) Equal(want zitadel.Restrictions, observed zitadel.Restrictions) bool {
-	return want.DisallowPublicOrgRegistration == observed.DisallowPublicOrgRegistration &&
-		common.EqualStringSlices(want.AllowedLanguages, observed.AllowedLanguages)
+// Equal reports whether the observed restrictions already match the desired
+// ones. A field the manifest left unset is not compared, so Zitadel's own value
+// for it is left alone.
+func (restrictionsDriver) Equal(cr common.ManagedPolicy, want zitadel.Restrictions, observed zitadel.Restrictions) bool {
+	fp := cr.(*v1alpha1.InstanceRestrictions).Spec.ForProvider
+
+	if fp.DisallowPublicOrgRegistration != nil &&
+		want.DisallowPublicOrgRegistration != observed.DisallowPublicOrgRegistration {
+		return false
+	}
+
+	if fp.AllowedLanguages != nil && !common.EqualStringSlices(want.AllowedLanguages, observed.AllowedLanguages) {
+		return false
+	}
+
+	return true
 }
 
 // The secret generators
@@ -367,14 +409,53 @@ func (secretGeneratorDriver) Report(mg common.ManagedPolicy, observed zitadel.Se
 	cr.Status.AtProvider.IncludeSymbols = observed.IncludeSymbols
 }
 
-func (secretGeneratorDriver) Equal(want zitadel.SecretGenerator, observed zitadel.SecretGenerator) bool {
-	return want.Type == observed.Type &&
-		want.Length == observed.Length &&
-		sameDuration(want.Expiry, observed.Expiry) &&
-		want.IncludeLowerLetters == observed.IncludeLowerLetters &&
-		want.IncludeUpperLetters == observed.IncludeUpperLetters &&
-		want.IncludeDigits == observed.IncludeDigits &&
-		want.IncludeSymbols == observed.IncludeSymbols
+// Equal reports whether the observed generator already matches the desired one.
+// A field the manifest left unset is not compared, so Zitadel's own value for it
+// is left alone.
+func (secretGeneratorDriver) Equal(cr common.ManagedPolicy, want zitadel.SecretGenerator, observed zitadel.SecretGenerator) bool {
+	fp := cr.(*v1alpha1.InstanceSecretGenerator).Spec.ForProvider
+
+	for _, f := range []struct {
+		name string
+		set  bool
+		want bool
+		got  bool
+	}{
+		{"IncludeLowerLetters", fp.IncludeLowerLetters != nil, want.IncludeLowerLetters, observed.IncludeLowerLetters},
+		{"IncludeUpperLetters", fp.IncludeUpperLetters != nil, want.IncludeUpperLetters, observed.IncludeUpperLetters},
+		{"IncludeDigits", fp.IncludeDigits != nil, want.IncludeDigits, observed.IncludeDigits},
+		{"IncludeSymbols", fp.IncludeSymbols != nil, want.IncludeSymbols, observed.IncludeSymbols},
+	} {
+		if f.set && f.want != f.got {
+			return false
+		}
+	}
+
+	for _, f := range []struct {
+		name string
+		set  bool
+		want uint32
+		got  uint32
+	}{
+		{"Length", fp.Length != nil, want.Length, observed.Length},
+	} {
+		if f.set && f.want != f.got {
+			return false
+		}
+	}
+
+	// The generator type is the resource's identity rather than something the
+	// manifest chooses, so it is always compared: a generator of one type is
+	// never the desired state of another.
+	if want.Type != observed.Type {
+		return false
+	}
+
+	if fp.Expiry != nil && !sameDuration(want.Expiry, observed.Expiry) {
+		return false
+	}
+
+	return true
 }
 
 // sameDuration compares two durations by what they mean rather than by how they

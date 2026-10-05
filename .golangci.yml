@@ -74,6 +74,11 @@ linters:
           - dupl
           - errcheck
           - exportloopref
+          # A table driven test repeats its own case names and fixture values on
+          # purpose: the repetition is what makes the table readable, so a
+          # literal appearing many times in one package says nothing about the
+          # code under test.
+          - goconst
           - gocyclo
           - gosec
           - unparam

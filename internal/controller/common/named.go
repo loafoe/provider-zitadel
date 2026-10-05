@@ -108,7 +108,11 @@ type NamedVerifier[CR ManagedNamed] interface {
 	Verify(ctx context.Context, c *zitadel.Client, scope string, cr CR, entry zitadel.Domain)
 }
 
-func (e *namedExternal[CR]) Disconnect(_ context.Context) error { return e.zc.Close() }
+func (e *namedExternal[CR]) Disconnect(_ context.Context) error {
+	e.zc.Release()
+
+	return nil
+}
 
 // namedExternal reconciles one member of a Zitadel list.
 type namedExternal[CR ManagedNamed] struct {

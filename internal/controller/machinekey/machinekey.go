@@ -58,9 +58,13 @@ func newExternal(_ context.Context, kube client.Client, _ resource.ModernManaged
 	return &external{kube: kube, client: zc}, nil
 }
 
-// Disconnect releases the underlying Zitadel client.
+// Disconnect releases this reconcile's claim on the Zitadel client. The
+// client itself is usually shared and outlives the reconcile, so this is a
+// no-op unless the client is not owned by a cache.
 func (e *external) Disconnect(ctx context.Context) error {
-	return e.client.Close()
+	e.client.Release()
+
+	return nil
 }
 
 // resolve resolves the service account the key belongs to.

@@ -125,7 +125,12 @@ func (driver) Report(cr common.ManagedPolicy, observed zitadel.LoginPolicy) {
 }
 
 // Equal reports whether the observed policy already matches the desired one.
-func (driver) Equal(want zitadel.LoginPolicyInput, got zitadel.LoginPolicy) bool {
+// Equal reports whether the observed policy already matches the desired one.
+//
+// Unlike the other policies, this one defaults an unset field to Zitadel's own
+// documented default rather than declining to manage it - see Desired - so the
+// two values can be compared directly without consulting the spec.
+func (driver) Equal(_ common.ManagedPolicy, want zitadel.LoginPolicyInput, got zitadel.LoginPolicy) bool {
 	return samePolicy(want, &got)
 }
 

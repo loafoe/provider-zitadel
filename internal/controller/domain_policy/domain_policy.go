@@ -134,21 +134,16 @@ func (driver) Report(mg common.ManagedPolicy, observed zitadel.DomainPolicy) {
 // Equal reports whether the observed policy already matches the desired one.
 //
 // A field the operator left unset is not compared, so Zitadel's own defaults are
-// never fought over.
-func (driver) Equal(want zitadel.DomainPolicyInput, observed zitadel.DomainPolicy) bool {
-	for _, f := range []struct {
-		name string
-		want bool
-		got  bool
-	}{
-		{"UserLoginMustBeDomain", want.UserLoginMustBeDomain, observed.UserLoginMustBeDomain},
-		{"ValidateOrgDomains", want.ValidateOrgDomains, observed.ValidateOrgDomains},
-		{"SMTPSenderAddressMatchesInstanceDomain", want.SMTPSenderAddressMatchesInstanceDomain, observed.SMTPSenderAddressMatchesInstanceDomain},
-	} {
-		if f.want != f.got {
-			return false
-		}
-	}
+// never fought over. Every field here is optional in the CRD, which is what makes
+// that more than a convention: Desired turns an unset field into the zero value,
+// so comparing it would report drift on every poll for a manifest that never
+// asked for the field to be managed. See common.AllSetMatch.
+func (driver) Equal(cr common.ManagedPolicy, want zitadel.DomainPolicyInput, observed zitadel.DomainPolicy) bool {
+	fp := cr.(*v1alpha1.DomainPolicy).Spec.ForProvider
 
-	return true
+	return common.AllSetMatch(
+		common.Match("UserLoginMustBeDomain", fp.UserLoginMustBeDomain != nil, want.UserLoginMustBeDomain, observed.UserLoginMustBeDomain),
+		common.Match("ValidateOrgDomains", fp.ValidateOrgDomains != nil, want.ValidateOrgDomains, observed.ValidateOrgDomains),
+		common.Match("SMTPSenderAddressMatchesInstanceDomain", fp.SMTPSenderAddressMatchesInstanceDomain != nil, want.SMTPSenderAddressMatchesInstanceDomain, observed.SMTPSenderAddressMatchesInstanceDomain),
+	)
 }

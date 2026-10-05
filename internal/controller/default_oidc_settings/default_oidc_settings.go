@@ -110,22 +110,17 @@ func (driver) Report(mg common.ManagedPolicy, observed zitadel.DefaultOIDCSettin
 // Equal reports whether the observed policy already matches the desired one.
 //
 // A field the operator left unset is not compared, so Zitadel's own defaults are
-// never fought over.
-func (driver) Equal(want zitadel.DefaultOIDCSettingsInput, observed zitadel.DefaultOIDCSettings) bool {
-	for _, f := range []struct {
-		name string
-		want string
-		got  string
-	}{
-		{"AccessTokenLifetime", want.AccessTokenLifetime, observed.AccessTokenLifetime},
-		{"IDTokenLifetime", want.IDTokenLifetime, observed.IDTokenLifetime},
-		{"RefreshTokenExpiration", want.RefreshTokenExpiration, observed.RefreshTokenExpiration},
-		{"RefreshTokenIdleExpiration", want.RefreshTokenIdleExpiration, observed.RefreshTokenIdleExpiration},
-	} {
-		if f.want != f.got {
-			return false
-		}
-	}
+// never fought over. Every field here is optional in the CRD, which is what makes
+// that more than a convention: Desired turns an unset field into the zero value,
+// so comparing it would report drift on every poll for a manifest that never
+// asked for the field to be managed. See common.AllSetMatch.
+func (driver) Equal(cr common.ManagedPolicy, want zitadel.DefaultOIDCSettingsInput, observed zitadel.DefaultOIDCSettings) bool {
+	fp := cr.(*v1alpha1.DefaultOIDCSettings).Spec.ForProvider
 
-	return true
+	return common.AllSetMatch(
+		common.Match("AccessTokenLifetime", fp.AccessTokenLifetime != nil, want.AccessTokenLifetime, observed.AccessTokenLifetime),
+		common.Match("IDTokenLifetime", fp.IDTokenLifetime != nil, want.IDTokenLifetime, observed.IDTokenLifetime),
+		common.Match("RefreshTokenExpiration", fp.RefreshTokenExpiration != nil, want.RefreshTokenExpiration, observed.RefreshTokenExpiration),
+		common.Match("RefreshTokenIdleExpiration", fp.RefreshTokenIdleExpiration != nil, want.RefreshTokenIdleExpiration, observed.RefreshTokenIdleExpiration),
+	)
 }
