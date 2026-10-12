@@ -5,7 +5,7 @@ A **native** [Crossplane](https://crossplane.io) provider for
 organizations, users, projects, applications, policies, actions and identity
 providers as Crossplane managed resources.
 
-## Written by hand, not generated
+## Native, not generated
 
 This provider is **not** built with [Upjet](https://github.com/crossplane/upjet).
 There is no Terraform binary, no Terraform provider and no generated code from
@@ -22,6 +22,10 @@ Zitadel's modern **v2 gRPC APIs** (`user.v2`, `project.v2`, `application.v2`,
   surfaces the Terraform provider is still built on.
 * **Readable drift detection.** When a resource drifts, the logic that decided
   it is a few lines of Go you can read, not generated scaffolding.
+
+It was architected and directed by a human, and written with the Space Bunny
+Alpha coding model over two weekends — no scaffold to inherit its shape from,
+which is what makes the controllers as short as they are.
 
 ## Coverage
 
