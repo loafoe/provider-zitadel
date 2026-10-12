@@ -12,7 +12,7 @@ readable Go controller per managed resource, and it uses the modern Zitadel
 | | |
 |---|---|
 | Provider package | `ghcr.io/loafoe/provider-zitadel` — multi-arch, cosigned |
-| Managed resources | **80** namespaced kinds, plus **19** cluster scoped variants |
+| Managed resources | **81** namespaced kinds, plus **19** cluster scoped variants — **100** in all |
 | Namespaced group | `zitadel.m.crossplane.io/v1alpha1` |
 | Cluster scoped group | `zitadel.crossplane.io/v1alpha1` (with `ClusterProviderConfig`) |
 | Platforms | `linux/amd64`, `linux/arm64` |
@@ -52,7 +52,8 @@ team.
 | `ActionExecutionEvent` | Action targets to call on a Zitadel event, or a group of them. |
 | `ActionExecutionFunction` | Action targets to call when another action calls a named function. |
 | `TriggerActions` | Actions to run at a point in a login flow, such as once a user has authenticated. |
-| `LockoutPolicy` … `DefaultSecuritySettings` | The seven organization policies, and the ten instance-wide policies they inherit from. |
+| `DomainPolicy`, `LabelPolicy`, `LockoutPolicy`, `NotificationPolicy`, `PasswordAgePolicy`, `PasswordComplexityPolicy`, `PrivacyPolicy` | The seven organization policies that sit beside `LoginPolicy`: branding, password rules, notifications and privacy. |
+| `DefaultDomainPolicy` … `DefaultSecuritySettings` | The ten instance-wide policies an organization inherits until it sets its own. |
 | `InstanceFeatures`, `SystemFeatures`, `InstanceRestrictions`, `InstanceSecretGenerator` | The four instance wide settings that are a single value: the feature flags, the registration restrictions, and the shape of one of Zitadel's generated codes. |
 | `InstanceCustomDomain`, `InstanceTrustedDomain`, `OrganizationDomain` | The three lists of domains: the ones the instance answers on, the ones allowed to ask it for a token, and the ones an organization owns. |
 | `WebKey`, `ActiveWebKey`, `ApplicationKey`, `ProjectMember` | Zitadel's own signing keys and which one is active, the key an application authenticates itself with, and a user's roles on a project. |
@@ -68,7 +69,7 @@ for what is next.
 
 ### Grouping the resources
 
-The kinds fall into four groups, and it helps to know which one you are looking
+The kinds fall into ten groups, and it helps to know which one you are looking
 at when a manifest fails:
 
 * **Structure** — `Organization`, `Project`, `ProjectRole`, `OIDCApplication`,
@@ -79,8 +80,8 @@ at when a manifest fails:
   `ProjectGrant`, `ProjectGrantMember`. These attach roles to subjects; none of
   them creates a subject.
 * **Settings** — `UserMetadata`, `OrganizationMetadata`, `LoginPolicy`, and the
-  other sixteen policies: seven per organization and the instance-wide defaults
-  they inherit.
+  other seventeen policies: seven more per organization and the ten
+  instance-wide defaults they inherit.
 * **Actions** — `Action`, `ActionTarget`, `ActionTargetPublicKey`, and the five
   bindings that say when a target is called: four execution kinds plus
   `TriggerActions`.
@@ -97,10 +98,11 @@ at when a manifest fails:
 * **Keys and grants** — `WebKey` (a signing key Zitadel generates),
   `ApplicationKey` (the key an application authenticates itself with, whose
   private half is written to the connection secret), and `ProjectMember`.
-* **Identity providers** — twelve provider types, each in two forms: one
-  available to the whole instance (`IDPGitHub`) and one belonging to an
-  organization (`OrgIDPGitHub`). Twenty three kinds in all, and the last block
-  of the Terraform provider's surface.
+* **Identity providers** — the largest block: twenty three kinds covering twelve
+  provider types. Eleven are available to the whole instance (`IDPGitHub`) and
+  twelve belong to one organization (`OrgIDPGitHub`), which is twenty three
+  rather than twenty four because `OrgIDPJWT` has no instance-wide counterpart
+  — Zitadel only offers the JWT provider per organization.
 
 ### What Zitadel will and will not read back
 
@@ -276,7 +278,7 @@ publishes `userID` and `username`, a `PersonalAccessToken` publishes `token`,
 `tokenID` and `userID`, a `MachineKey` publishes `keyID` and `key.json`, and an
 `ApplicationAPI` publishes `clientID` plus `clientSecret` or `privateKey`.
 
-More examples live in [`examples/`](./examples), one file per kind.
+More examples live in [`examples/`](./examples).
 
 ## Sharing a project with another organization
 
@@ -443,10 +445,15 @@ Zitadel and Crossplane between them make that unreliable:
 
 ## Installing
 
+Every command below writes `<version>`, which is a release tag from
+[the releases page](https://github.com/loafoe/provider-zitadel/releases) —
+`v0.3.0` at the time of writing. Install a tag rather than `latest`: only tags
+are signed.
+
 As a Crossplane v2 package:
 
 ```console
-crossplane xpkg install provider ghcr.io/loafoe/provider-zitadel:v0.1.0
+crossplane xpkg install provider ghcr.io/loafoe/provider-zitadel:<version>
 ```
 
 Or, without the Crossplane package machinery, apply just the CRDs:
@@ -486,10 +493,10 @@ Verify a release yourself:
 cosign verify \
   --certificate-identity-regexp '^https://github\.com/loafoe/provider-zitadel/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
-  ghcr.io/loafoe/provider-zitadel:v0.1.0
+  ghcr.io/loafoe/provider-zitadel:<version>
 ```
 
-or `make verify-signature VERSION=v0.1.0`. `make sign VERSION=v0.1.0` is the
+or `make verify-signature VERSION=<version>`. `make sign VERSION=<version>` is the
 signing half, for when you need to re-sign from a different runner.
 
 ### The package is the runtime image
@@ -518,7 +525,7 @@ registry: read access to a **public** package.
 Verify what is actually published before suspecting the install:
 
 ```console
-hack/verify-multiarch.sh ghcr.io/loafoe/provider-zitadel:v0.1.0
+hack/verify-multiarch.sh ghcr.io/loafoe/provider-zitadel:<version>
 ```
 
 ### For maintainers: the GHCR package has to belong to the repository
@@ -549,11 +556,11 @@ Every publish and promote runs `hack/verify-multiarch.sh`, which is also useful
 by hand:
 
 ```console
-hack/verify-multiarch.sh ghcr.io/loafoe/provider-zitadel:v0.1.0
+hack/verify-multiarch.sh ghcr.io/loafoe/provider-zitadel:<version>
 ```
 
 ```
-==> ghcr.io/loafoe/provider-zitadel:v0.1.0
+==> ghcr.io/loafoe/provider-zitadel:<version>
     mediaType: application/vnd.oci.image.index.v1+json
     platforms: linux/amd64, linux/arm64
 All references cover: linux/amd64 linux/arm64
@@ -589,7 +596,7 @@ workflow as the only accepted signer:
 
 ```console
 kubectl apply -f examples/imageconfig-signature-verification.yaml
-crossplane xpkg install provider ghcr.io/loafoe/provider-zitadel:v0.1.0
+crossplane xpkg install provider ghcr.io/loafoe/provider-zitadel:<version>
 ```
 
 Note that only release tags are signed. Branch builds pushed by CI are
@@ -667,7 +674,7 @@ held to a higher standard than the historical average.
 ### Connections
 
 A Zitadel client opens **one** gRPC connection and shares it across all twelve
-ZITADEL services it wraps, because they are gRPC services on one endpoint and
+Zitadel services it wraps, because they are gRPC services on one endpoint and
 gRPC multiplexes concurrent RPCs over a single HTTP/2 connection.
 
 Clients are cached per ProviderConfig and shared, so every resource pointing at
@@ -693,16 +700,16 @@ reason is always the same: something outside Zitadel is needed and is not there.
 | Verified | How far |
 | --- | --- |
 | `OrgIDPJWT`, `OrgIDPOAuth` | Full lifecycle: created, read back, drifted, corrected, deleted |
-| `OrgIDPSAML`, `IDPGitHub`, `IDPAzureAD` | Created with real ZITADEL identifiers and deleted |
-| `OrgIDPLDAP`, `OrgIDPApple` | Reached ZITADEL and were refused on their own validation, which is as far as a bare instance goes |
+| `OrgIDPSAML`, `IDPGitHub`, `IDPAzureAD` | Created with real Zitadel identifiers and deleted |
+| `OrgIDPLDAP`, `OrgIDPApple` | Reached Zitadel and were refused on their own validation, which is as far as a bare instance goes |
 
 | Not proven | Why |
 | --- | --- |
-| The other **18** identity provider kinds | Each needs a real upstream to federate to. |
-| `EmailProviderHTTP`, `SMSProviderHTTP` | ZITADEL refuses an arbitrary endpoint with `Errors.NotificationProvider.Blocked.Endpoint` — an instance policy, not a wiring problem. |
-| `SystemFeatures`, `InstanceCustomDomain` | ZITADEL returns `PermissionDenied` for both even to an IAM owner, while reading them works. |
+| The other **16** identity provider kinds | Each needs a real upstream to federate to. |
+| `EmailProviderHTTP`, `SMSProviderHTTP` | Zitadel refuses an arbitrary endpoint with `Errors.NotificationProvider.Blocked.Endpoint` — an instance policy, not a wiring problem. |
+| `SystemFeatures`, `InstanceCustomDomain` | Zitadel returns `PermissionDenied` for both even to an IAM owner, while reading them works. |
 
-That is 25 of the 80 capabilities whose write path is wired and reasoned about
+That is 20 of the 80 capabilities whose write path is wired and reasoned about
 but whose full round trip has not been observed on this instance.
 
 The fix is a loopback identity provider — a small SAML, LDAP and OIDC server in a
@@ -711,7 +718,7 @@ most of them. That is the highest value thing left, and it needs no new API work
 
 ### Zitadel capabilities the Terraform provider never modelled
 
-Parity is 100% of the Terraform surface, which is not the same as all of ZITADEL.
+Parity is 100% of the Terraform surface, which is not the same as all of Zitadel.
 These exist in the API and have no kind here at all, so they are additions rather
 than parity work:
 
@@ -729,7 +736,7 @@ than parity work:
   policy. A kind that reported *why* an endpoint was refused, rather than only
   surfacing Zitadel's error text, would be worth having.
 * `ActiveWebKey` and the settings kinds have no drift detection for the fields
-  ZITADEL does not return. That is a ZITADEL limitation rather than a gap here,
+  Zitadel does not return. That is a Zitadel limitation rather than a gap here,
   and it is documented where it applies.
 
 ### Scoped resources
@@ -750,12 +757,18 @@ what stops the answer from being "all of them":
 | | |
 | --- | --- |
 | **Yes** — `Organization`, `HumanUser`, `Project`, `OIDCApplication`, the 11 instance `IDP*` kinds, `ActionTarget`, `WebKey`, `InstanceCustomDomain`, `ActionExecution*`, `InstanceMember` and the rest | A namespace is how you separate them: by team, by environment, by tenant. Cluster scoping them would only take that away, and avoid no conflict. **Namespaced only.** |
-| **No** — the 10 `Default*Policy` defaults, `InstanceFeatures`, `SystemFeatures`, `InstanceRestrictions`, `ActiveWebKey`, the 4 messaging providers | Two of them are the same settings, and the second writer wins. Cluster scoping makes that conflict unrepresentable. **Both.** |
+| **No** — the 10 instance-wide defaults, `InstanceFeatures`, `SystemFeatures`, `InstanceRestrictions`, `InstanceSecretGenerator`, `ActiveWebKey`, the 4 messaging providers | Two of them are the same settings, and the second writer wins. Cluster scoping makes that conflict unrepresentable. **Both.** |
 
 The 19 kinds with both are `ClusterInstanceFeatures`, `ClusterSystemFeatures`,
 `ClusterInstanceRestrictions`, `ClusterInstanceSecretGenerator`,
-`ClusterActiveWebKey`, `ClusterDefault{Lockout,Notification,PasswordAge,PasswordComplexity,Privacy,Domain,Label,Login,OIDCSettings,SecuritySettings}Policy`,
-`ClusterDefaultOIDCSettings` and `Cluster{EmailProviderSMTP,EmailProviderHTTP,SMSProviderTwilio,SMSProviderHTTP}`.
+`ClusterActiveWebKey`, the ten `ClusterDefault*` policies and settings
+(`ClusterDefaultDomainPolicy`, `ClusterDefaultLabelPolicy`,
+`ClusterDefaultLockoutPolicy`, `ClusterDefaultLoginPolicy`,
+`ClusterDefaultNotificationPolicy`, `ClusterDefaultPasswordAgePolicy`,
+`ClusterDefaultPasswordComplexityPolicy`, `ClusterDefaultPrivacyPolicy`,
+`ClusterDefaultOIDCSettings`, `ClusterDefaultSecuritySettings`) and
+`ClusterEmailProviderSMTP`, `ClusterEmailProviderHTTP`, `ClusterSMSProviderTwilio`,
+`ClusterSMSProviderHTTP`.
 
 **None of it is a second implementation.** Each cluster scoped kind is reconciled
 by the controller that already reconciles the namespaced one: the resource is
@@ -795,10 +808,11 @@ modelling is missing, so the figures cannot drift away from it. It reports
 | Deliberately not modelled | 9 |
 | Managed resource kinds here | 100, of which 19 are cluster scoped variants |
 
-Two of the eighty are ours in a way the Terraform provider's are not: a v2
-application is split here into `ApplicationAPI` and `OIDCApplication`, because
-Zitadel has one application service with three types in it and the two kinds
-carry genuinely different settings.
+The eighty capabilities are 81 namespaced kinds, because one is split in two: a
+v2 application becomes `ApplicationAPI` and `OIDCApplication` here. Zitadel has
+one application service with three types in it, and the two kinds carry
+genuinely different settings, where the Terraform provider keeps them in a
+single `application_v2` resource.
 
 The Terraform provider registers 89 resources, which the following reads straight
 out of its own source:
@@ -806,7 +820,7 @@ out of its own source:
 ```console
 git clone --depth 1 --filter=blob:none --sparse \
   https://github.com/zitadel/terraform-provider-zitadel.git
-cd tf-zitadel && git sparse-checkout set zitadel
+cd terraform-provider-zitadel && git sparse-checkout set zitadel
 grep -oE '"zitadel_[a-z0-9_]+":\s*\w+\.GetResource\(\)' zitadel/provider.go | sort -u | wc -l
 ```
 
