@@ -21,9 +21,10 @@ readable Go controller per managed resource, and it uses the modern Zitadel
 
 ## Managed resources
 
-Everything is a **namespaced** managed resource, so a whole Zitadel tenancy can
+Every managed resource has a **namespaced** form, so a whole Zitadel tenancy can
 be described in one namespace and permissions can be scoped down to a single
-team.
+team. The nineteen kinds that are instance-wide singletons also have a cluster
+scoped form; see [Scoped resources](#scoped-resources).
 
 | Kind | Purpose |
 |---|---|
@@ -62,10 +63,11 @@ team.
 | `IDPOIDC`, `IDPOAuth`, `IDPApple`, `IDPAzureAD`, `IDPGitHub`, `IDPGitHubEnterpriseServer`, `IDPGitLab`, `IDPGitLabSelfHosted`, `IDPGoogle`, `IDPLDAP`, `IDPSAML` | Identity providers available to every organization that has not set up its own. |
 | `OrgIDPOIDC`, `OrgIDPOAuth`, `OrgIDPJWT`, `OrgIDPApple`, `OrgIDPAzureAD`, `OrgIDPGitHub`, `OrgIDPGitHubEnterpriseServer`, `OrgIDPGitLab`, `OrgIDPGitLabSelfHosted`, `OrgIDPGoogle`, `OrgIDPLDAP`, `OrgIDPSAML` | The same providers, belonging to one organization. |
 
-All managed resources are namespaced, in `zitadel.m.crossplane.io/v1alpha1`.
-`ProviderConfig` stays cluster wide in `zitadel.crossplane.io/v1alpha1`, so one
-ProviderConfig can serve every namespace that needs it. See [Roadmap](#roadmap)
-for what is next.
+Managed resources live in `zitadel.m.crossplane.io/v1alpha1` when namespaced, and
+the nineteen cluster scoped variants live in `zitadel.crossplane.io/v1alpha1`
+beside `ProviderConfig` and `ClusterProviderConfig`. Either form can serve any
+namespace that needs it. See [Scoped resources](#scoped-resources) for which
+kinds get both, and why.
 
 ### Grouping the resources
 
