@@ -4434,6 +4434,11 @@ func (in *HumanUserParameters) DeepCopyInto(out *HumanUserParameters) {
 		*out = new(v1.LocalSecretKeySelector)
 		**out = **in
 	}
+	if in.HashedPasswordSecretRef != nil {
+		in, out := &in.HashedPasswordSecretRef, &out.HashedPasswordSecretRef
+		*out = new(v1.LocalSecretKeySelector)
+		**out = **in
+	}
 	if in.PasswordChangeRequired != nil {
 		in, out := &in.PasswordChangeRequired, &out.PasswordChangeRequired
 		*out = new(bool)

@@ -19,6 +19,7 @@ package actiontarget
 import (
 	"testing"
 
+	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/loafoe/provider-zitadel/apis/zitadel/v1alpha1"
@@ -258,9 +259,20 @@ func TestUpdateStatus(t *testing.T) {
 			t.Errorf("%s: -want, +got:\n%s", name, diff)
 		}
 	}
+}
 
-	if ap.SigningKey != "signing-key" {
-		t.Errorf("SigningKey: want %q, got %q", "signing-key", ap.SigningKey)
+// The signing key is what lets the receiving side verify a payload, so it is
+// published to the connection secret and never to the status.
+func TestConnectionDetails(t *testing.T) {
+	got := connectionDetails(&zitadel.ActionTarget{ID: "t1", SigningKey: "signing-key"})
+
+	want := managed.ConnectionDetails{
+		ConnectionKeyTargetID:   []byte("t1"),
+		ConnectionKeySigningKey: []byte("signing-key"),
+	}
+
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("connectionDetails(...): -want, +got:\n%s", diff)
 	}
 }
 

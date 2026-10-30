@@ -96,6 +96,23 @@ spec:
                   givenName:
                     description: GivenName is the first name of the user.
                     type: string
+                  hashedPasswordSecretRef:
+                    description: |-
+                      HashedPasswordSecretRef references the secret key holding an already
+                      hashed initial password, for migrating a user from another Zitadel
+                      instance. Zitadel never returns the password again, so changing it does
+                      not update the remote user. Only used on creation, and mutually exclusive
+                      with passwordSecretRef.
+                    properties:
+                      key:
+                        type: string
+                      name:
+                        description: Name of the secret.
+                        type: string
+                    required:
+                    - key
+                    - name
+                    type: object
                   id:
                     description: |-
                       ID allows setting a custom user ID. If omitted Zitadel generates one. It
@@ -236,7 +253,8 @@ spec:
                     description: |-
                       PasswordSecretRef references the secret key holding the initial password
                       of the user. Zitadel never returns the password again, so changing it
-                      does not update the remote user. Only used on creation.
+                      does not update the remote user. Only used on creation, and mutually
+                      exclusive with hashedPasswordSecretRef.
                     properties:
                       key:
                         type: string
@@ -280,6 +298,10 @@ spec:
                 - familyName
                 - givenName
                 type: object
+                x-kubernetes-validations:
+                - message: passwordSecretRef and hashedPasswordSecretRef are mutually
+                    exclusive
+                  rule: '!(has(self.passwordSecretRef) && has(self.hashedPasswordSecretRef))'
               managementPolicies:
                 default:
                 - '*'

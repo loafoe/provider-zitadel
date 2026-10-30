@@ -74,11 +74,6 @@ type ActionTargetObservation struct {
 	// How the payload is encoded.
 	// +optional
 	PayloadType *string `json:"payloadType,omitempty"`
-
-	// The key Zitadel signs this target's payloads with. Generated once, at
-	// creation, and never changed.
-	// +optional
-	SigningKey string `json:"signingKey,omitempty"`
 }
 
 // ActionTarget is somewhere an action's payload is sent.

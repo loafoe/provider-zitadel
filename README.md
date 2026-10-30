@@ -200,8 +200,10 @@ The `billing-web-oidc` secret is written with:
 
 A `HumanUser` additionally publishes `userID` and `username`, a `ServiceAccount`
 publishes `userID` and `username`, a `PersonalAccessToken` publishes `token`,
-`tokenID` and `userID`, a `MachineKey` publishes `keyID` and `key.json`, and an
-`ApplicationAPI` publishes `clientID` plus `clientSecret` or `privateKey`.
+`tokenID` and `userID`, a `MachineKey` publishes `keyID` and `key.json`, an
+`ApplicationAPI` publishes `clientID` plus `clientSecret` or `privateKey`, and an
+`ActionTarget` publishes `targetID` and `signingKey` - the only place the signing
+key appears, since it is not copied into the resource's status.
 
 More examples live in [`examples/`](./examples).
 

@@ -27,6 +27,8 @@ spec:
     emailVerification: Verified
     phone: "+491234567890"
     phoneVerification: Verified
+    # For a user migrated from another Zitadel instance, use
+    # hashedPasswordSecretRef instead (they are mutually exclusive).
     passwordSecretRef:
       name: alice-initial-password
       key: password

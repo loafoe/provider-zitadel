@@ -100,12 +100,9 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	cr.Status.SetConditions(xpv1.Available())
 
 	return managed.ExternalObservation{
-		ResourceExists:   true,
-		ResourceUpToDate: isUpToDate(cr, t),
-		ConnectionDetails: managed.ConnectionDetails{
-			ConnectionKeyTargetID:   []byte(t.ID),
-			ConnectionKeySigningKey: []byte(t.SigningKey),
-		},
+		ResourceExists:    true,
+		ResourceUpToDate:  isUpToDate(cr, t),
+		ConnectionDetails: connectionDetails(t),
 	}, nil
 }
 
@@ -131,10 +128,17 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.Wrap(err, "the target was created but its signing key could not be read")
 	}
 
-	return managed.ExternalCreation{ConnectionDetails: managed.ConnectionDetails{
+	return managed.ExternalCreation{ConnectionDetails: connectionDetails(t)}, nil
+}
+
+// connectionDetails is what the receiving side needs to verify a payload. The
+// signing key is published here and nowhere else: a custom resource's status is
+// not a secret.
+func connectionDetails(t *zitadel.ActionTarget) managed.ConnectionDetails {
+	return managed.ConnectionDetails{
 		ConnectionKeyTargetID:   []byte(t.ID),
 		ConnectionKeySigningKey: []byte(t.SigningKey),
-	}}, nil
+	}
 }
 
 func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
@@ -219,7 +223,6 @@ func updateStatus(cr *v1alpha1.ActionTarget, t *zitadel.ActionTarget) {
 	cr.Status.AtProvider.Endpoint = common.StringPtr(t.Endpoint)
 	cr.Status.AtProvider.Timeout = common.StringPtr(t.Timeout)
 	cr.Status.AtProvider.PayloadType = common.StringPtr(t.PayloadType)
-	cr.Status.AtProvider.SigningKey = t.SigningKey
 }
 
 func valueOrType(t *v1alpha1.ActionTargetType) v1alpha1.ActionTargetType {

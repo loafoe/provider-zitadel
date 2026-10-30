@@ -60,6 +60,10 @@ type CreateHumanUserInput struct {
 	// set, which leaves the user in the Initial state.
 	Password string
 
+	// HashedPassword is an already hashed initial password, for migrations from
+	// another Zitadel instance. It is mutually exclusive with Password.
+	HashedPassword string
+
 	// PasswordChangeRequired forces the user to change its password on the next
 	// login.
 	PasswordChangeRequired bool
@@ -344,7 +348,20 @@ func (c *Client) CreateHumanUser(ctx context.Context, in CreateHumanUserInput) (
 		human.Phone = phone
 	}
 
-	if in.Password != "" {
+	if in.Password != "" && in.HashedPassword != "" {
+		return nil, fmt.Errorf("password and hashed password are mutually exclusive")
+	}
+
+	switch {
+	case in.HashedPassword != "":
+		human.PasswordType = &userv2.CreateUserRequest_Human_HashedPassword{
+			HashedPassword: &userv2.HashedPassword{
+				Hash:           in.HashedPassword,
+				ChangeRequired: in.PasswordChangeRequired,
+			},
+		}
+
+	case in.Password != "":
 		human.PasswordType = &userv2.CreateUserRequest_Human_Password{
 			Password: &userv2.Password{
 				Password:       in.Password,

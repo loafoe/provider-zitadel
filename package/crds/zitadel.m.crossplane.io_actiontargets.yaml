@@ -165,11 +165,6 @@ spec:
                   payloadType:
                     description: How the payload is encoded.
                     type: string
-                  signingKey:
-                    description: |-
-                      The key Zitadel signs this target's payloads with. Generated once, at
-                      creation, and never changed.
-                    type: string
                   timeout:
                     description: How long Zitadel waits for the target.
                     type: string

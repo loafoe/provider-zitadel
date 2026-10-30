@@ -26,6 +26,8 @@ import (
 )
 
 // HumanUserParameters are the configurable fields of a HumanUser.
+//
+// +kubebuilder:validation:XValidation:rule="!(has(self.passwordSecretRef) && has(self.hashedPasswordSecretRef))",message="passwordSecretRef and hashedPasswordSecretRef are mutually exclusive"
 type HumanUserParameters struct {
 	// UserName is the unique username of the user within the organization. If
 	// omitted Zitadel defaults it to the email address.
@@ -75,9 +77,18 @@ type HumanUserParameters struct {
 
 	// PasswordSecretRef references the secret key holding the initial password
 	// of the user. Zitadel never returns the password again, so changing it
-	// does not update the remote user. Only used on creation.
+	// does not update the remote user. Only used on creation, and mutually
+	// exclusive with hashedPasswordSecretRef.
 	// +optional
 	PasswordSecretRef *xpv1.LocalSecretKeySelector `json:"passwordSecretRef,omitempty"`
+
+	// HashedPasswordSecretRef references the secret key holding an already
+	// hashed initial password, for migrating a user from another Zitadel
+	// instance. Zitadel never returns the password again, so changing it does
+	// not update the remote user. Only used on creation, and mutually exclusive
+	// with passwordSecretRef.
+	// +optional
+	HashedPasswordSecretRef *xpv1.LocalSecretKeySelector `json:"hashedPasswordSecretRef,omitempty"`
 
 	// PasswordChangeRequired forces the user to change the initial password on
 	// the first login. Only used on creation.

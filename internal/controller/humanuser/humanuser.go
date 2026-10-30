@@ -36,8 +36,9 @@ import (
 )
 
 const (
-	errNotHumanUser = "managed resource is not a HumanUser custom resource"
-	errNoOrgID      = "cannot determine the organization of the user"
+	errNotHumanUser     = "managed resource is not a HumanUser custom resource"
+	errNoOrgID          = "cannot determine the organization of the user"
+	errPasswordConflict = "passwordSecretRef and hashedPasswordSecretRef are mutually exclusive"
 )
 
 // Setup adds a controller that reconciles HumanUser managed resources.
@@ -216,12 +217,24 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		})
 	}
 
+	if fp.PasswordSecretRef != nil && fp.HashedPasswordSecretRef != nil {
+		return managed.ExternalCreation{}, errors.New(errPasswordConflict)
+	}
+
 	if fp.PasswordSecretRef != nil {
-		pw, err := e.password(ctx, cr, fp.PasswordSecretRef)
+		pw, err := e.secret(ctx, cr, fp.PasswordSecretRef, "initial password")
 		if err != nil {
 			return managed.ExternalCreation{}, err
 		}
 		in.Password = pw
+	}
+
+	if fp.HashedPasswordSecretRef != nil {
+		hash, err := e.secret(ctx, cr, fp.HashedPasswordSecretRef, "hashed password")
+		if err != nil {
+			return managed.ExternalCreation{}, err
+		}
+		in.HashedPassword = hash
 	}
 
 	if fp.PasswordChangeRequired != nil {
@@ -373,9 +386,9 @@ func (e *external) organizationID(ctx context.Context, cr *v1alpha1.HumanUser) (
 	return id, nil
 }
 
-// password reads the initial password of the user from the referenced secret in
-// the namespace of the managed resource.
-func (e *external) password(ctx context.Context, cr *v1alpha1.HumanUser, ref *xpv1.LocalSecretKeySelector) (string, error) {
+// secret reads a credential of the user from the referenced secret in the
+// namespace of the managed resource.
+func (e *external) secret(ctx context.Context, cr *v1alpha1.HumanUser, ref *xpv1.LocalSecretKeySelector, what string) (string, error) {
 	secretRef := xpv1.SecretKeySelector{
 		SecretReference: xpv1.SecretReference{Name: ref.Name, Namespace: cr.GetNamespace()},
 		Key:             ref.Key,
@@ -384,7 +397,7 @@ func (e *external) password(ctx context.Context, cr *v1alpha1.HumanUser, ref *xp
 	data, err := resource.CommonCredentialExtractor(ctx, xpv1.CredentialsSourceSecret, e.kube,
 		xpv1.CommonCredentialSelectors{SecretRef: &secretRef})
 	if err != nil {
-		return "", errors.Wrap(err, "cannot read initial password of user")
+		return "", errors.Wrapf(err, "cannot read %s of user", what)
 	}
 
 	return string(data), nil

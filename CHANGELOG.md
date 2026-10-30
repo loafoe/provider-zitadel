@@ -8,6 +8,13 @@ All notable changes to this provider are recorded here. The format follows
 
 ### Changed
 
+- **`ActionTarget` no longer copies its signing key into `status.atProvider`.**
+  Zitadel returns the key on every read, but it is what lets the receiving side
+  verify a payload, so a custom resource's status is not the place for it. It is
+  still published to the connection secret under the same `signingKey` key, so a
+  workload reads it from exactly one place. Existing objects keep working; the
+  status field is simply no longer written (and no longer part of the CRD).
+
 - **The provider now reuses one Zitadel connection instead of building twelve
   per reconcile.** A `zitadel.Client` previously opened a separate gRPC
   connection for each of the ZITADEL services it wrapped - twelve in all, each
@@ -70,6 +77,12 @@ All notable changes to this provider are recorded here. The format follows
 
 ### Added
 
+- **`HumanUser` accepts `hashedPasswordSecretRef` for migrations.** The value is
+  an already hashed initial password, read from a secret like the plaintext one,
+  and passed to Zitadel as a hashed password rather than hashed again or sent as
+  plaintext. It is only used at creation and is mutually exclusive with
+  `passwordSecretRef`, which the CRD enforces. This is the migration case that
+  previously required importing the user outside the provider.
 - An in-process fake ZITADEL gRPC server for tests, used to drive the client
   layer against real requests and to assert that a client dials exactly one
   connection. A fake admin API and a fake management API on top of it cover the
