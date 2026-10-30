@@ -11,7 +11,7 @@ on:
 env:
   # Common versions
   GO_VERSION: '1.27'
-  GOLANGCI_VERSION: 'v2.13.2'
+  GOLANGCI_VERSION: 'v2.15.0'
   DOCKER_BUILDX_VERSION: 'v0.23.0'
 
   # Common users. We can't run a step 'if secrets.XXX != ""' but we can run a
@@ -72,14 +72,17 @@ jobs:
       # We could run 'make lint' but we prefer this action because it leaves
       # 'annotations' (i.e. it comments on PRs to point out linter violations).
       #
-      # The linter is built from source with the Go toolchain installed above
-      # (install-mode: goinstall) instead of downloading a release binary. A
-      # release binary is built with whatever Go version the golangci-lint
-      # maintainers used, and go/types in it cannot read the export data of a
-      # newer toolchain. With the Go 1.27.2 that setup-go resolves '1.27' to,
-      # the prebuilt binary fails every package with:
-      #   export data version 5 is greater than maximum supported version 4
-      # Building it with our own toolchain keeps the two ends in lockstep.
+      # Two things have to line up here:
+      #
+      #  * The linter must understand the export data the Go toolchain emits.
+      #    Go 1.27.2+ writes unified IR version 5, and the pkgbits decoder in
+      #    golangci-lint v2.13.x (x/tools v0.49) only reads up to version 4, so
+      #    every package failed with "export data version 5 is greater than
+      #    maximum supported version 4". v2.14.0 moved to x/tools v0.50, which
+      #    reads version 5.
+      #  * install-mode: goinstall builds the linter with the same toolchain
+      #    installed above instead of a release binary built with an older Go,
+      #    so the linter's go/types never lags the code being checked.
       - name: Lint
         uses: golangci/golangci-lint-action@v9.3.0
         with:
