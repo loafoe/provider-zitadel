@@ -56,15 +56,11 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-      # Renovate parks a new branch behind a "Pending" commit status while it
-      # waits out minimumReleaseAge. Without this it cannot set that status, and
-      # any failure there aborts the whole run - it reports "repository has
-      # changed during renovation", which is not what went wrong.
+      # Needed if minimumReleaseAge is ever turned back on: Renovate parks a new
+      # branch behind a "Pending" commit status while it waits, and a failure to
+      # set that status aborts the whole run under the misleading message
+      # "repository has changed during renovation".
       statuses: write
-      # The action pins live in .github/workflows/*, and GitHub refuses a push
-      # that edits a workflow file unless the push token may write workflows.
-      # Without it the "github actions" and "ci tooling" groups fail to land.
-      workflows: write
 
     steps:
       - name: Checkout
@@ -74,10 +70,17 @@ jobs:
         uses: renovatebot/github-action@v46.3.10
         with:
           renovate-version: ${{ env.RENOVATE_VERSION }}
-          # A PAT (RENOVATE_TOKEN) is preferred when it is configured: PRs opened
-          # with the default GITHUB_TOKEN do not trigger other workflows, so CI
-          # would not run on Renovate's pull requests. Without the secret we
-          # still work, just without checks on those PRs.
+          # RENOVATE_TOKEN is strongly preferred over GITHUB_TOKEN, for two
+          # reasons. Pull requests opened with GITHUB_TOKEN do not trigger other
+          # workflows, so no checks run on them. And GitHub rejects any push that
+          # edits .github/workflows/* unless the pushing token may write
+          # workflows - a permission GITHUB_TOKEN cannot be given (it is not one
+          # of the keys allowed under `permissions:`). Without the secret the
+          # action pins in the workflow env blocks therefore never get a PR;
+          # they show up as pending on the dependency dashboard instead. A
+          # fine-grained PAT needs: contents, issues, pull requests, commit
+          # statuses and workflows - all read and write. A GitHub App token
+          # works too and is less long-lived.
           token: ${{ secrets.RENOVATE_TOKEN || secrets.GITHUB_TOKEN }}
           configurationFile: '.github/renovate-config.js'
         env:

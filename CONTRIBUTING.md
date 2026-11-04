@@ -79,6 +79,13 @@ it silently: no branch, no pull request, just an entry on the dependency
 dashboard. One freshly published `actions/*` or the Renovate image itself was
 enough to keep the whole group waiting.
 
+The `github actions`, `ci tooling` and `sigs.k8s.io`-style groups that only
+change version pins inside `.github/workflows/*` need a token that may write
+workflows. `GITHUB_TOKEN` cannot be given that permission, so those groups stay
+pending until the `RENOVATE_TOKEN` secret is set (see the comment above the
+`token:` input in the workflow). Setting it also makes CI run on Renovate's
+pull requests, which `GITHUB_TOKEN`-opened PRs do not trigger.
+
 ## Reporting bugs
 
 Open an issue with the Zitadel version, the Crossplane version, the manifest you
