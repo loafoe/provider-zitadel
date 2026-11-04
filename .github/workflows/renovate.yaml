@@ -56,6 +56,11 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      # Renovate parks a new branch behind a "Pending" commit status while it
+      # waits out minimumReleaseAge. Without this it cannot set that status, and
+      # any failure there aborts the whole run - it reports "repository has
+      # changed during renovation", which is not what went wrong.
+      statuses: write
 
     steps:
       - name: Checkout
