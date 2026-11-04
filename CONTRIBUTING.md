@@ -68,7 +68,10 @@ npx --yes --package renovate renovate-config-validator renovate.json
 Updates are grouped so that the version of a thing that is pinned twice (cosign
 in the `Makefile` and in the release workflow, say) moves in one commit. Go
 minor and patch updates arrive as one pull request, `k8s.io/*` and `sigs.k8s.io/*`
-as another, and a major Go bump gets its own with a `major` label.
+as another, and a major Go bump gets its own with a `major` label. Because the
+grouping keeps the volume low, the default limit of two pull requests per hour
+is turned off (`prHourlyLimit: 0`); without that, a fresh set of groups trickles
+in over several hours and looks like nothing happened.
 
 ## Reporting bugs
 

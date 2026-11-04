@@ -6,6 +6,7 @@
     ":timezone(Etc/UTC)"
   ],
   "labels": ["dependencies"],
+  "prHourlyLimit": 0,
   "minimumReleaseAge": "3 days",
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
