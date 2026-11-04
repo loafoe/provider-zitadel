@@ -61,6 +61,10 @@ jobs:
       # any failure there aborts the whole run - it reports "repository has
       # changed during renovation", which is not what went wrong.
       statuses: write
+      # The action pins live in .github/workflows/*, and GitHub refuses a push
+      # that edits a workflow file unless the push token may write workflows.
+      # Without it the "github actions" and "ci tooling" groups fail to land.
+      workflows: write
 
     steps:
       - name: Checkout
