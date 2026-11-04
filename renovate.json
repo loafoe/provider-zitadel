@@ -1,10 +1,188 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":semanticCommitsDisabled"],
+  "extends": [
+    "config:recommended",
+    ":semanticCommitsDisabled",
+    ":timezone(Etc/UTC)"
+  ],
+  "labels": ["dependencies"],
+  "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "3 days",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["dependencies", "security"],
+    "schedule": ["at any time"],
+    "minimumReleaseAge": null
+  },
+  "postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"],
+  "ignorePaths": ["**/_output/**", "**/.cache/**", "**/.work/**"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Go toolchain pinned in the workflows. Only major.minor is tracked: setup-go resolves the patch release, so Renovate proposes a new minor, not every patch.",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": ["GO_VERSION:\\s*'(?<currentValue>\\d+\\.\\d+)'"],
+      "depNameTemplate": "golang",
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "golangci-lint version installed by golangci-lint-action.",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": ["GOLANGCI_VERSION:\\s*'(?<currentValue>[^']+)'"],
+      "depNameTemplate": "golangci/golangci-lint",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "buildx version installed by docker/setup-buildx-action.",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": ["DOCKER_BUILDX_VERSION:\\s*'(?<currentValue>[^']+)'"],
+      "depNameTemplate": "docker/buildx",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "cosign version installed by sigstore/cosign-installer.",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": ["COSIGN_VERSION:\\s*'(?<currentValue>[^']+)'"],
+      "depNameTemplate": "sigstore/cosign",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "crane version used by the release workflow.",
+      "managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+      "matchStrings": ["CRANE_VERSION:\\s*'(?<currentValue>[^']+)'"],
+      "depNameTemplate": "google/go-containerregistry",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "golangci-lint binary the Makefile downloads for `make lint`.",
+      "managerFilePatterns": ["/^Makefile$/"],
+      "matchStrings": ["GOLANGCILINT_VERSION\\s*[?:]?=\\s*(?<currentValue>[^\\s#]+)"],
+      "depNameTemplate": "golangci/golangci-lint",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "cosign binary the Makefile downloads for the sign and verify targets. Must match the version the release workflow installs.",
+      "managerFilePatterns": ["/^Makefile$/"],
+      "matchStrings": ["COSIGN_VERSION\\s*[?:]?=\\s*v?(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "sigstore/cosign",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v?(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "gomplate binary the Makefile downloads for rendering examples.",
+      "managerFilePatterns": ["/^Makefile$/"],
+      "matchStrings": ["GOMPLATE_VERSION\\s*[?:]?=\\s*(?<currentValue>[^\\s#]+)"],
+      "depNameTemplate": "hairyhenderson/gomplate",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "Renovate itself, as pinned by the self-hosted workflow.",
+      "managerFilePatterns": ["/^\\.github/workflows/renovate\\.ya?ml$/"],
+      "matchStrings": ["RENOVATE_VERSION:\\s*(?<currentValue>[^\\s#]+)"],
+      "depNameTemplate": "renovate",
+      "datasourceTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "description": "Node image the integration test cluster is created with.",
+      "managerFilePatterns": ["/^cluster/local/integration_tests\\.sh$/"],
+      "matchStrings": ["KIND_NODE_IMAGE_TAG:-v?(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "kindest/node",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "semver-coerced"
+    },
+    {
+      "customType": "regex",
+      "description": "Crossplane chart the integration tests install.",
+      "managerFilePatterns": ["/^cluster/local/integration_tests\\.sh$/"],
+      "matchStrings": ["CROSSPLANE_CHART_VERSION:-v?(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "crossplane",
+      "datasourceTemplate": "helm"
+    },
+    {
+      "customType": "regex",
+      "description": "Zitadel chart the integration tests install.",
+      "managerFilePatterns": ["/^cluster/local/integration_tests\\.sh$/"],
+      "matchStrings": ["ZITADEL_CHART_VERSION:-v?(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "zitadel",
+      "datasourceTemplate": "helm"
+    }
+  ],
   "packageRules": [
     {
-      "matchManagers": ["gomod", "github-actions"],
-      "groupName": "Go and CI dependencies"
+      "description": "The build submodule tracks crossplane/build, whose CI changes have to be reviewed on their own rather than folded into a dependency PR.",
+      "matchManagers": ["git-submodules"],
+      "enabled": false
+    },
+    {
+      "description": "Keep k8s.io and sigs.k8s.io on one version. They are released in lockstep, so a PR that moves one without the others does not compile.",
+      "matchPackageNames": ["k8s.io/**", "sigs.k8s.io/**", "github.com/crossplane/**"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "kubernetes libraries"
+    },
+    {
+      "description": "GO_VERSION pins major.minor only; the patch release is resolved by setup-go.",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": ["golang"],
+      "allowedVersions": "/^\\d+\\.\\d+$/"
+    },
+    {
+      "description": "Chart repositories the integration test script installs from.",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": ["crossplane"],
+      "registryUrls": ["https://charts.crossplane.io/stable"]
+    },
+    {
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": ["zitadel"],
+      "registryUrls": ["https://charts.zitadel.io"]
+    },
+    {
+      "description": "The binaries the workflows and the Makefile download are bumped together, since the same CI run exercises all of them.",
+      "matchManagers": ["custom.regex"],
+      "matchDepNames": [
+        "golangci/golangci-lint",
+        "docker/buildx",
+        "sigstore/cosign",
+        "google/go-containerregistry",
+        "hairyhenderson/gomplate",
+        "renovate"
+      ],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "ci tooling"
+    },
+    {
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "go dependencies (minor and patch)"
+    },
+    {
+      "description": "A major bump of a Go dependency gets its own PR and a label: it is the kind of update that needs reading rather than skimming.",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["major"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["digest", "pinDigest"],
+      "groupName": "container image digests"
+    },
+    {
+      "matchFileNames": ["cluster/local/integration_tests.sh"],
+      "groupName": "integration test environment"
     }
   ]
 }

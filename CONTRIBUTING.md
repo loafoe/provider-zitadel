@@ -38,6 +38,38 @@ make provider.addtype provider=Zitadel group=zitadel kind=Foo
 Then register the controller in `internal/controller/register.go` and add an
 example under `examples/`.
 
+## Dependencies
+
+Dependency updates are opened by Renovate, running from
+`.github/workflows/renovate.yaml` on a daily schedule. It is configured in
+`renovate.json`; `.github/renovate-config.js` only holds settings that cannot
+live in repository config (identity, platform, no onboarding).
+
+Most versions are managed without any extra work: `go.mod`, the `uses:` pins in
+the workflows, and the digest of the distroless base image in
+`cluster/images/provider-zitadel/Dockerfile`. Versions that are written as plain
+strings are managed by the `customManagers` entries in `renovate.json`:
+
+| Where | What |
+| --- | --- |
+| `GO_VERSION`, `GOLANGCI_VERSION`, `DOCKER_BUILDX_VERSION`, `COSIGN_VERSION`, `CRANE_VERSION` in `.github/workflows/*.yml` | tool versions the workflows install |
+| `GOLANGCILINT_VERSION`, `COSIGN_VERSION`, `GOMPLATE_VERSION` in `Makefile` | binaries the make targets download |
+| `RENOVATE_VERSION` in `.github/workflows/renovate.yaml` | Renovate itself |
+| `KIND_NODE_IMAGE_TAG`, `CROSSPLANE_CHART_VERSION`, `ZITADEL_CHART_VERSION` in `cluster/local/integration_tests.sh` | what the integration tests stand up |
+
+If you pin a version somewhere new, add a `customManagers` entry for it rather
+than leaving it to rot, and run the config through the validator that
+`.github/workflows/renovate.yaml` runs on pull requests:
+
+```console
+npx --yes --package renovate renovate-config-validator renovate.json
+```
+
+Updates are grouped so that the version of a thing that is pinned twice (cosign
+in the `Makefile` and in the release workflow, say) moves in one commit. Go
+minor and patch updates arrive as one pull request, `k8s.io/*` and `sigs.k8s.io/*`
+as another, and a major Go bump gets its own with a `major` label.
+
 ## Reporting bugs
 
 Open an issue with the Zitadel version, the Crossplane version, the manifest you

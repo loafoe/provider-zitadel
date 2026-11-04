@@ -5,15 +5,38 @@ on:
     paths:
       - '.github/workflows/renovate.yaml'
       - '.github/renovate-config.js'
+      - 'renovate.json'
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
 
 env:
-  # renovate: datasource=npm depName=renovate
+  # Managed by the customManagers entry for it in renovate.json.
   RENOVATE_VERSION: 44.198.0
 
 jobs:
+  # A malformed renovate.json only shows up the next time the schedule fires,
+  # so validate it on the pull request that changes it, against the same
+  # Renovate version the scheduled run uses.
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate configuration
+        run: npx --yes --package renovate@${{ env.RENOVATE_VERSION }} renovate-config-validator renovate.json
+
   renovate:
     runs-on: ubuntu-latest
 
