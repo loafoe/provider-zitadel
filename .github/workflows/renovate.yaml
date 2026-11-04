@@ -10,6 +10,12 @@ on:
     - cron: '0 0 * * *'
   workflow_dispatch:
 
+# Two runs at once fight over the same branches, and one of them aborts with
+# "repository has changed during renovation". Let a second run wait instead.
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
 env:
   # Managed by the customManagers entry for it in renovate.json.
   RENOVATE_VERSION: 44.198.0
