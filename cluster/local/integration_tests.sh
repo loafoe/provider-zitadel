@@ -173,7 +173,7 @@ install_zitadel() {
 
   log "installing Zitadel"
 
-  helm repo add zitadel https://charts.zitadel.io >/dev/null
+  helm repo add zitadel https://charts.zitadel.com >/dev/null
   helm repo update zitadel >/dev/null
 
   helm upgrade --install zitadel zitadel/zitadel \
