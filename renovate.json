@@ -7,13 +7,11 @@
   ],
   "labels": ["dependencies"],
   "prHourlyLimit": 0,
-  "minimumReleaseAge": "3 days",
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
     "enabled": true,
     "labels": ["dependencies", "security"],
-    "schedule": ["at any time"],
-    "minimumReleaseAge": null
+    "schedule": ["at any time"]
   },
   "postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"],
   "ignorePaths": ["**/_output/**", "**/.cache/**", "**/.work/**"],

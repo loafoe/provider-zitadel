@@ -73,6 +73,12 @@ grouping keeps the volume low, the default limit of two pull requests per hour
 is turned off (`prHourlyLimit: 0`); without that, a fresh set of groups trickles
 in over several hours and looks like nothing happened.
 
+There is deliberately no `minimumReleaseAge`. With it set, Renovate holds a
+group until *every* dependency in it is older than the threshold, and it holds
+it silently: no branch, no pull request, just an entry on the dependency
+dashboard. One freshly published `actions/*` or the Renovate image itself was
+enough to keep the whole group waiting.
+
 ## Reporting bugs
 
 Open an issue with the Zitadel version, the Crossplane version, the manifest you
