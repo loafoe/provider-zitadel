@@ -9,6 +9,12 @@ on:
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Renovate log level'
+        type: choice
+        options: [info, debug]
+        default: info
 
 # Two runs at once fight over the same branches, and one of them aborts with
 # "repository has changed during renovation". Let a second run wait instead.
@@ -69,4 +75,4 @@ jobs:
           RENOVATE_ALLOW_SCRIPTS: true
           RENOVATE_SEPARATE_MAJOR_MINOR: false
           RENOVATE_REPOSITORIES: ${{ github.repository }}
-          LOG_LEVEL: 'info'
+          LOG_LEVEL: ${{ inputs.logLevel || 'info' }}
