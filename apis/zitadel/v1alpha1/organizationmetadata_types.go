@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -34,11 +33,11 @@ type OrganizationMetadataParameters struct {
 
 	// OrganizationRef references an Organization managed by this provider.
 	// +optional
-	OrganizationRef *xpv1.Reference `json:"organizationRef,omitempty"`
+	OrganizationRef *xpv2.Reference `json:"organizationRef,omitempty"`
 
 	// OrganizationSelector selects an Organization managed by this provider.
 	// +optional
-	OrganizationSelector *xpv1.Selector `json:"organizationSelector,omitempty"`
+	OrganizationSelector *xpv2.Selector `json:"organizationSelector,omitempty"`
 
 	// Metadata is the complete set of metadata keys of the organization.
 	// +optional
@@ -54,11 +53,11 @@ type OrganizationMetadataObservation struct {
 
 	// OrganizationRef references an Organization managed by this provider.
 	// +optional
-	OrganizationRef *xpv1.Reference `json:"organizationRef,omitempty"`
+	OrganizationRef *xpv2.Reference `json:"organizationRef,omitempty"`
 
 	// OrganizationSelector selects an Organization managed by this provider.
 	// +optional
-	OrganizationSelector *xpv1.Selector `json:"organizationSelector,omitempty"`
+	OrganizationSelector *xpv2.Selector `json:"organizationSelector,omitempty"`
 
 	// Metadata is the metadata set Zitadel currently holds.
 	// +optional
@@ -73,8 +72,8 @@ type OrganizationMetadataSpec struct {
 
 // A OrganizationMetadataStatus represents the observed state of a OrganizationMetadata.
 type OrganizationMetadataStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          OrganizationMetadataObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 OrganizationMetadataObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -44,13 +43,13 @@ type ProjectMemberParameters struct {
 	// uses its ID.
 	//
 	// +optional
-	OrganizationRef *xpv1.Reference `json:"organizationRef,omitempty"`
+	OrganizationRef *xpv2.Reference `json:"organizationRef,omitempty"`
 
 	// OrganizationSelector selects an Organization managed by this provider and
 	// uses its ID.
 	//
 	// +optional
-	OrganizationSelector *xpv1.Selector `json:"organizationSelector,omitempty"`
+	OrganizationSelector *xpv2.Selector `json:"organizationSelector,omitempty"`
 
 	// ProjectID is the ID of the project the resource belongs to. Either
 	// `projectID`, `projectRef` or `projectSelector` must be set.
@@ -61,12 +60,12 @@ type ProjectMemberParameters struct {
 	// ProjectRef references a Project managed by this provider and uses its ID.
 	//
 	// +optional
-	ProjectRef *xpv1.Reference `json:"projectRef,omitempty"`
+	ProjectRef *xpv2.Reference `json:"projectRef,omitempty"`
 
 	// ProjectSelector selects a Project managed by this provider and uses its ID.
 	//
 	// +optional
-	ProjectSelector *xpv1.Selector `json:"projectSelector,omitempty"`
+	ProjectSelector *xpv2.Selector `json:"projectSelector,omitempty"`
 
 	// UserID is the ID of the user the grant applies to. Either `userID`,
 	// `userRef` or `userSelector` must be set.
@@ -78,13 +77,13 @@ type ProjectMemberParameters struct {
 	// and uses its ID.
 	//
 	// +optional
-	UserRef *xpv1.Reference `json:"userRef,omitempty"`
+	UserRef *xpv2.Reference `json:"userRef,omitempty"`
 
 	// UserSelector selects a HumanUser or ServiceAccount managed by this provider
 	// and uses its ID.
 	//
 	// +optional
-	UserSelector *xpv1.Selector `json:"userSelector,omitempty"`
+	UserSelector *xpv2.Selector `json:"userSelector,omitempty"`
 
 	// Roles controls the following. The roles the user holds on the project, such as `PROJECT_OWNER`. A project may define roles of its own, so the keys are not fixed. Zitadel refuses a member with no role at all, so at least one is required: to take every role away, delete this resource instead
 	//
@@ -104,7 +103,7 @@ type ProjectMemberObservation struct {
 
 // ProjectMemberStatus reports the observed state of a grant a user roles on a project.
 type ProjectMemberStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
+	xpv2.ManagedResourceStatus `json:",inline"`
 
 	// AtProvider is the observed state.
 	AtProvider ProjectMemberObservation `json:"atProvider,omitempty"`

@@ -19,7 +19,7 @@ package messaging
 import (
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/loafoe/provider-zitadel/apis/zitadel/v1alpha1"
@@ -46,16 +46,16 @@ const (
 // claim a provider it does not own.
 
 func TestRefOrNil(t *testing.T) {
-	ref := xpv1.Reference{Name: "customer"}
+	ref := xpv2.Reference{Name: "customer"}
 
 	cases := map[string]struct {
 		reason string
-		in     xpv1.Reference
-		want   *xpv1.Reference
+		in     xpv2.Reference
+		want   *xpv2.Reference
 	}{
 		"Unset": {
 			reason: "An empty reference becomes nil, so the resolver falls through to the plain identifier",
-			in:     xpv1.Reference{},
+			in:     xpv2.Reference{},
 			want:   nil,
 		},
 		"Set": {
@@ -76,17 +76,17 @@ func TestRefOrNil(t *testing.T) {
 
 func TestSelOrNil(t *testing.T) {
 	yes := true
-	byLabel := xpv1.Selector{MatchLabels: map[string]string{"team": "platform"}}
-	byOwner := xpv1.Selector{MatchControllerRef: &yes}
+	byLabel := xpv2.Selector{MatchLabels: map[string]string{"team": "platform"}}
+	byOwner := xpv2.Selector{MatchControllerRef: &yes}
 
 	cases := map[string]struct {
 		reason string
-		in     xpv1.Selector
-		want   *xpv1.Selector
+		in     xpv2.Selector
+		want   *xpv2.Selector
 	}{
 		"Unset": {
 			reason: "A selector with neither labels nor an owner is nil",
-			in:     xpv1.Selector{},
+			in:     xpv2.Selector{},
 			want:   nil,
 		},
 		"MatchLabels": {

@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -49,12 +48,12 @@ type ProjectRoleParameters struct {
 
 	// ProjectRef references a Project managed by this provider and uses its ID.
 	// +optional
-	ProjectRef *xpv1.Reference `json:"projectRef,omitempty"`
+	ProjectRef *xpv2.Reference `json:"projectRef,omitempty"`
 
 	// ProjectSelector selects a Project managed by this provider and uses its
 	// ID.
 	// +optional
-	ProjectSelector *xpv1.Selector `json:"projectSelector,omitempty"`
+	ProjectSelector *xpv2.Selector `json:"projectSelector,omitempty"`
 }
 
 // ProjectRoleObservation are the observable fields of a ProjectRole.
@@ -92,8 +91,8 @@ type ProjectRoleSpec struct {
 
 // A ProjectRoleStatus represents the observed state of a ProjectRole.
 type ProjectRoleStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          ProjectRoleObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 ProjectRoleObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

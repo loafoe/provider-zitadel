@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -80,7 +79,7 @@ type HumanUserParameters struct {
 	// does not update the remote user. Only used on creation, and mutually
 	// exclusive with hashedPasswordSecretRef.
 	// +optional
-	PasswordSecretRef *xpv1.LocalSecretKeySelector `json:"passwordSecretRef,omitempty"`
+	PasswordSecretRef *xpv2.LocalSecretKeySelector `json:"passwordSecretRef,omitempty"`
 
 	// HashedPasswordSecretRef references the secret key holding an already
 	// hashed initial password, for migrating a user from another Zitadel
@@ -88,7 +87,7 @@ type HumanUserParameters struct {
 	// not update the remote user. Only used on creation, and mutually exclusive
 	// with passwordSecretRef.
 	// +optional
-	HashedPasswordSecretRef *xpv1.LocalSecretKeySelector `json:"hashedPasswordSecretRef,omitempty"`
+	HashedPasswordSecretRef *xpv2.LocalSecretKeySelector `json:"hashedPasswordSecretRef,omitempty"`
 
 	// PasswordChangeRequired forces the user to change the initial password on
 	// the first login. Only used on creation.
@@ -112,12 +111,12 @@ type HumanUserParameters struct {
 	// OrganizationRef references an Organization managed by this provider and
 	// uses its ID.
 	// +optional
-	OrganizationRef *xpv1.Reference `json:"organizationRef,omitempty"`
+	OrganizationRef *xpv2.Reference `json:"organizationRef,omitempty"`
 
 	// OrganizationSelector selects an Organization managed by this provider and
 	// uses its ID.
 	// +optional
-	OrganizationSelector *xpv1.Selector `json:"organizationSelector,omitempty"`
+	OrganizationSelector *xpv2.Selector `json:"organizationSelector,omitempty"`
 
 	// ID allows setting a custom user ID. If omitted Zitadel generates one. It
 	// cannot be changed after creation.
@@ -202,8 +201,8 @@ type HumanUserSpec struct {
 
 // A HumanUserStatus represents the observed state of a HumanUser.
 type HumanUserStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          HumanUserObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 HumanUserObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

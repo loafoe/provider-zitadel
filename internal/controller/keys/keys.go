@@ -27,11 +27,11 @@ package keys
 import (
 	"context"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -142,7 +142,7 @@ func (e *webKeyExternal) Observe(ctx context.Context, mg resource.Managed) (mana
 	cr.Status.AtProvider.State = k.State
 	cr.Status.AtProvider.CreationDate = k.CreationDate
 	cr.Status.AtProvider.ChangeDate = k.ChangeDate
-	cr.SetConditions(xpv1.Available())
+	cr.SetConditions(xpv2.Available())
 
 	return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
 }
@@ -153,7 +153,7 @@ func (e *webKeyExternal) Create(ctx context.Context, mg resource.Managed) (manag
 		return managed.ExternalCreation{}, errors.New("managed resource is not a WebKey")
 	}
 
-	cr.SetConditions(xpv1.Creating())
+	cr.SetConditions(xpv2.Creating())
 
 	fp := cr.Spec.ForProvider
 	id, err := e.client.CreateWebKey(ctx, zitadel.WebKeyAlgorithm{
@@ -184,7 +184,7 @@ func (e *webKeyExternal) Delete(ctx context.Context, mg resource.Managed) (manag
 		return managed.ExternalDelete{}, errors.New("managed resource is not a WebKey")
 	}
 
-	cr.SetConditions(xpv1.Deleting())
+	cr.SetConditions(xpv2.Deleting())
 
 	return managed.ExternalDelete{}, e.client.DeleteWebKey(ctx, meta.GetExternalName(cr))
 }
@@ -247,7 +247,7 @@ func (e *applicationKeyExternal) Observe(ctx context.Context, mg resource.Manage
 	cr.Status.AtProvider.ID = k.ID
 	cr.Status.AtProvider.CreationDate = k.CreationDate
 	cr.Status.AtProvider.ExpirationDate = k.ExpirationDate
-	cr.SetConditions(xpv1.Available())
+	cr.SetConditions(xpv2.Available())
 
 	return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
 }
@@ -258,7 +258,7 @@ func (e *applicationKeyExternal) Create(ctx context.Context, mg resource.Managed
 		return managed.ExternalCreation{}, errors.New("managed resource is not an ApplicationKey")
 	}
 
-	cr.SetConditions(xpv1.Creating())
+	cr.SetConditions(xpv2.Creating())
 
 	if _, err := e.organization(ctx, cr); err != nil {
 		return managed.ExternalCreation{}, err
@@ -301,7 +301,7 @@ func (e *applicationKeyExternal) Delete(ctx context.Context, mg resource.Managed
 		return managed.ExternalDelete{}, errors.New("managed resource is not an ApplicationKey")
 	}
 
-	cr.SetConditions(xpv1.Deleting())
+	cr.SetConditions(xpv2.Deleting())
 
 	// The project and the application were recorded when the key was made, which
 	// is what a terminating object uses: references are not guaranteed to still
@@ -421,7 +421,7 @@ func (e *projectMemberExternal) Observe(ctx context.Context, mg resource.Managed
 	cr.Status.AtProvider.UserName = m.UserName
 	cr.Status.AtProvider.DisplayName = m.DisplayName
 	cr.Status.AtProvider.ProjectName = m.ProjectName
-	cr.SetConditions(xpv1.Available())
+	cr.SetConditions(xpv2.Available())
 
 	return managed.ExternalObservation{
 		ResourceExists: true,
@@ -437,7 +437,7 @@ func (e *projectMemberExternal) Create(ctx context.Context, mg resource.Managed)
 		return managed.ExternalCreation{}, errors.New("managed resource is not a ProjectMember")
 	}
 
-	cr.SetConditions(xpv1.Creating())
+	cr.SetConditions(xpv2.Creating())
 
 	scope, err := e.scope(ctx, cr)
 	if err != nil {
@@ -469,7 +469,7 @@ func (e *projectMemberExternal) Delete(ctx context.Context, mg resource.Managed)
 		return managed.ExternalDelete{}, errors.New("managed resource is not a ProjectMember")
 	}
 
-	cr.SetConditions(xpv1.Deleting())
+	cr.SetConditions(xpv2.Deleting())
 
 	// A terminating object must not follow a reference that has since moved: it
 	// exists to undo what it did, so it acts on the user it recorded. The project

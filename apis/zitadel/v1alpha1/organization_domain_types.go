@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -44,13 +43,13 @@ type OrganizationDomainParameters struct {
 	// uses its ID.
 	//
 	// +optional
-	OrganizationRef *xpv1.Reference `json:"organizationRef,omitempty"`
+	OrganizationRef *xpv2.Reference `json:"organizationRef,omitempty"`
 
 	// OrganizationSelector selects an Organization managed by this provider and
 	// uses its ID.
 	//
 	// +optional
-	OrganizationSelector *xpv1.Selector `json:"organizationSelector,omitempty"`
+	OrganizationSelector *xpv2.Selector `json:"organizationSelector,omitempty"`
 
 	// The domain the organization owns. Zitadel adds it unverified; it
 	// becomes verified once the organization has proved it owns the domain,
@@ -82,7 +81,7 @@ type OrganizationDomainObservation struct {
 
 // OrganizationDomainStatus reports the observed state of a Zitadel organization domain.
 type OrganizationDomainStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
+	xpv2.ManagedResourceStatus `json:",inline"`
 
 	// AtProvider is the observed state.
 	AtProvider OrganizationDomainObservation `json:"atProvider,omitempty"`

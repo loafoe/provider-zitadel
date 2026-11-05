@@ -26,11 +26,11 @@ package messaging
 import (
 	"context"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -189,7 +189,7 @@ func (e *samlExternal) Observe(ctx context.Context, mg resource.Managed) (manage
 	cr.Status.AtProvider.MetadataXML = app.MetadataXML
 	cr.Status.AtProvider.MetadataURL = app.MetadataURL
 	cr.Status.AtProvider.LoginVersion = app.LoginVersion
-	cr.SetConditions(xpv1.Available())
+	cr.SetConditions(xpv2.Available())
 
 	fp := cr.Spec.ForProvider
 	want := zitadel.SAMLApplication{
@@ -231,7 +231,7 @@ func (e *samlExternal) Create(ctx context.Context, mg resource.Managed) (managed
 		return managed.ExternalCreation{}, errors.New("managed resource is not an ApplicationSAML")
 	}
 
-	cr.SetConditions(xpv1.Creating())
+	cr.SetConditions(xpv2.Creating())
 
 	projectID, err := e.project(ctx, cr)
 	if err != nil {
@@ -275,7 +275,7 @@ func (e *samlExternal) Delete(ctx context.Context, mg resource.Managed) (managed
 		return managed.ExternalDelete{}, errors.New("managed resource is not an ApplicationSAML")
 	}
 
-	cr.SetConditions(xpv1.Deleting())
+	cr.SetConditions(xpv2.Deleting())
 
 	// The project was recorded while the application was live, because Zitadel
 	// refuses a delete that does not carry it and a terminating object cannot
@@ -382,7 +382,7 @@ func (e *activeWebKeyExternal) Observe(ctx context.Context, mg resource.Managed)
 	cr.Status.AtProvider.Algorithm = k.Algorithm
 	cr.Status.AtProvider.State = k.State
 	cr.Status.WebKeyID = k.ID
-	cr.SetConditions(xpv1.Available())
+	cr.SetConditions(xpv2.Available())
 
 	return managed.ExternalObservation{
 		ResourceExists: true,
@@ -400,7 +400,7 @@ func (e *activeWebKeyExternal) Create(ctx context.Context, mg resource.Managed) 
 		return managed.ExternalCreation{}, errors.New("managed resource is not an ActiveWebKey")
 	}
 
-	cr.SetConditions(xpv1.Creating())
+	cr.SetConditions(xpv2.Creating())
 
 	keyID, err := e.key(ctx, cr)
 	if err != nil {
@@ -552,7 +552,7 @@ func (e *providerExternal) Observe(ctx context.Context, mg resource.Managed) (ma
 	}
 
 	e.d.Report(mg, *found)
-	mg.SetConditions(xpv1.Available())
+	mg.SetConditions(xpv2.Available())
 
 	want, err := e.d.Desired(ctx, e.kube, mg)
 	if err != nil {
@@ -609,7 +609,7 @@ func equal(want, observed zitadel.MessageProvider, state string, _ providerDrive
 }
 
 func (e *providerExternal) Create(ctx context.Context, mg resource.Managed) (managed.ExternalCreation, error) {
-	mg.SetConditions(xpv1.Creating())
+	mg.SetConditions(xpv2.Creating())
 
 	want, err := e.d.Desired(ctx, e.kube, mg)
 	if err != nil {
@@ -685,7 +685,7 @@ func (e *providerExternal) active(ctx context.Context, mg resource.Managed) bool
 }
 
 func (e *providerExternal) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {
-	mg.SetConditions(xpv1.Deleting())
+	mg.SetConditions(xpv2.Deleting())
 
 	return managed.ExternalDelete{}, e.d.Remove(ctx, e.client, meta.GetExternalName(mg))
 }
@@ -988,7 +988,7 @@ func (smsHTTPDriver) State(mg resource.Managed) string {
 
 // refOrNil and selOrNil turn an unset reference or selector into nil, which is
 // how the resolver is told to fall through to the plain identifier.
-func refOrNil(r xpv1.Reference) *xpv1.Reference {
+func refOrNil(r xpv2.Reference) *xpv2.Reference {
 	if r.Name == "" {
 		return nil
 	}
@@ -996,7 +996,7 @@ func refOrNil(r xpv1.Reference) *xpv1.Reference {
 	return &r
 }
 
-func selOrNil(s xpv1.Selector) *xpv1.Selector {
+func selOrNil(s xpv2.Selector) *xpv2.Selector {
 	if s.MatchLabels == nil && s.MatchControllerRef == nil {
 		return nil
 	}

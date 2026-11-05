@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -60,12 +59,12 @@ type ProjectParameters struct {
 	// OrganizationRef references an Organization managed by this provider and
 	// uses its ID.
 	// +optional
-	OrganizationRef *xpv1.Reference `json:"organizationRef,omitempty"`
+	OrganizationRef *xpv2.Reference `json:"organizationRef,omitempty"`
 
 	// OrganizationSelector selects an Organization managed by this provider and
 	// uses its ID.
 	// +optional
-	OrganizationSelector *xpv1.Selector `json:"organizationSelector,omitempty"`
+	OrganizationSelector *xpv2.Selector `json:"organizationSelector,omitempty"`
 
 	// ID allows setting a custom project ID. If omitted Zitadel generates one.
 	// It cannot be changed after creation.
@@ -157,8 +156,8 @@ type ProjectSpec struct {
 
 // A ProjectStatus represents the observed state of a Project.
 type ProjectStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          ProjectObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 ProjectObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

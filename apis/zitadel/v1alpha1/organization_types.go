@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -91,8 +90,8 @@ type OrganizationSpec struct {
 
 // An OrganizationStatus represents the observed state of an Organization.
 type OrganizationStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          OrganizationObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 OrganizationObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

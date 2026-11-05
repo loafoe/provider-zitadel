@@ -19,7 +19,7 @@ package loginpolicy
 import (
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/loafoe/provider-zitadel/apis/zitadel/v1alpha1"
@@ -296,7 +296,7 @@ func TestIsUpToDateAgainstObservedPolicy(t *testing.T) {
 
 	cr := &v1alpha1.LoginPolicy{Spec: v1alpha1.LoginPolicySpec{
 		ForProvider: v1alpha1.LoginPolicyParameters{
-			OrganizationRef:        &xpv1.Reference{Name: "platform"},
+			OrganizationRef:        &xpv2.Reference{Name: "platform"},
 			AllowRegister:          ptr(false),
 			IgnoreUnknownUsernames: ptr(true),
 			PasswordCheckLifetime:  ptr("8760h"),

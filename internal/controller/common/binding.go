@@ -20,11 +20,11 @@ import (
 	"context"
 	"strings"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
 	actionv2 "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/action/v2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -133,7 +133,7 @@ func (e *bindingExternal[CR, H]) Observe(ctx context.Context, mg resource.Manage
 	}
 
 	e.d.Report(cr, targets)
-	cr.SetConditions(xpv1.Available())
+	cr.SetConditions(xpv2.Available())
 
 	exists := true
 
@@ -157,7 +157,7 @@ func (e *bindingExternal[CR, H]) Create(ctx context.Context, mg resource.Managed
 		return managed.ExternalCreation{}, errors.Errorf("managed resource is not a %s", e.d.Kind())
 	}
 
-	cr.SetConditions(xpv1.Creating())
+	cr.SetConditions(xpv2.Creating())
 
 	if err := e.write(ctx, cr); err != nil {
 		return managed.ExternalCreation{}, err
@@ -193,7 +193,7 @@ func (e *bindingExternal[CR, H]) Delete(ctx context.Context, mg resource.Managed
 		return managed.ExternalDelete{}, errors.Errorf("managed resource is not a %s", e.d.Kind())
 	}
 
-	cr.SetConditions(xpv1.Deleting())
+	cr.SetConditions(xpv2.Deleting())
 
 	h, id, err := e.d.Condition(cr)
 	if err != nil {

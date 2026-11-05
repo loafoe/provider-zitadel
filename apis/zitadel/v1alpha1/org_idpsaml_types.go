@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -64,12 +63,12 @@ type OrgIDPSAMLParameters struct {
 	// OrganizationRef references an Organization managed by this provider and
 	// uses its ID.
 	// +optional
-	OrganizationRef *xpv1.Reference `json:"organizationRef,omitempty"`
+	OrganizationRef *xpv2.Reference `json:"organizationRef,omitempty"`
 
 	// OrganizationSelector selects an Organization managed by this provider and
 	// uses its ID.
 	// +optional
-	OrganizationSelector *xpv1.Selector `json:"organizationSelector,omitempty"`
+	OrganizationSelector *xpv2.Selector `json:"organizationSelector,omitempty"`
 
 	// Name of the provider, as it appears on the login page.
 	// +optional
@@ -149,8 +148,8 @@ type OrgIDPSAMLSpec struct {
 
 // OrgIDPSAMLStatus is the observed state of an OrgIDPSAML.
 type OrgIDPSAMLStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          OrgIDPSAMLObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 OrgIDPSAMLObservation `json:"atProvider,omitempty"`
 }
 
 // OrgIDPSAMLList contains a list of OrgIDPSAML.
@@ -201,13 +200,13 @@ func (mg *OrgIDPSAML) IDPOrganization() string { return Deref(mg.Status.AtProvid
 
 // GetOrganizationRef returns the reference the provider's organization is
 // resolved from.
-func (mg *OrgIDPSAML) GetOrganizationRef() *xpv1.Reference {
+func (mg *OrgIDPSAML) GetOrganizationRef() *xpv2.Reference {
 	return mg.Spec.ForProvider.OrganizationRef
 }
 
 // GetOrganizationSelector returns the selector the provider's organization
 // is resolved from.
-func (mg *OrgIDPSAML) GetOrganizationSelector() *xpv1.Selector {
+func (mg *OrgIDPSAML) GetOrganizationSelector() *xpv2.Selector {
 	return mg.Spec.ForProvider.OrganizationSelector
 }
 

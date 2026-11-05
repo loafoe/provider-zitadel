@@ -23,8 +23,8 @@ import (
 	"context"
 	stderrors "errors"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -137,7 +137,7 @@ type providerResolution struct {
 // a namespaced one authenticate through exactly the same rules and there is one
 // definition of what a Zitadel credential looks like.
 func resolveProviderConfig(ctx context.Context, kube client.Client, mg resource.ModernManaged,
-	ref *xpv1.ProviderConfigReference,
+	ref *xpv2.ProviderConfigReference,
 ) (*providerResolution, error) {
 	switch ref.Kind {
 	case "ClusterProviderConfig":
@@ -225,7 +225,7 @@ func ProviderConfigOrganizationID(ctx context.Context, kube client.Client, mg re
 // extractClusterCredentials reads the credentials of a cluster scoped
 // configuration, whose secret references name their own namespace.
 func extractClusterCredentials(ctx context.Context, kube client.Client, creds apisv1alpha1.ClusterZitadelCredentials) (zitadel.Credentials, error) {
-	if creds.Source != xpv1.CredentialsSourceSecret {
+	if creds.Source != xpv2.CredentialsSourceSecret {
 		return zitadel.Credentials{}, errors.New("only Secret credentials are supported")
 	}
 
@@ -262,7 +262,7 @@ func extractClusterCredentials(ctx context.Context, kube client.Client, creds ap
 }
 
 func extractCredentials(ctx context.Context, kube client.Client, namespace string, creds apisv1alpha1.ZitadelCredentials) (zitadel.Credentials, error) {
-	if creds.Source != xpv1.CredentialsSourceSecret {
+	if creds.Source != xpv2.CredentialsSourceSecret {
 		return zitadel.Credentials{}, errors.New("only Secret credentials are supported")
 	}
 
@@ -299,13 +299,13 @@ func extractCredentials(ctx context.Context, kube client.Client, namespace strin
 // secretValue reads a single key out of a secret in the namespace of the
 // managed resource.
 func secretValue(ctx context.Context, kube client.Client, namespace, name, key string) (string, error) {
-	ref := xpv1.SecretKeySelector{
-		SecretReference: xpv1.SecretReference{Name: name, Namespace: namespace},
+	ref := xpv2.SecretKeySelector{
+		SecretReference: xpv2.SecretReference{Name: name, Namespace: namespace},
 		Key:             key,
 	}
 
-	data, err := resource.CommonCredentialExtractor(ctx, xpv1.CredentialsSourceSecret, kube,
-		xpv1.CommonCredentialSelectors{SecretRef: &ref})
+	data, err := resource.CommonCredentialExtractor(ctx, xpv2.CredentialsSourceSecret, kube,
+		xpv2.CommonCredentialSelectors{SecretRef: &ref})
 	if err != nil {
 		return "", err
 	}

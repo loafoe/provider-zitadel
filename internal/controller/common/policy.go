@@ -20,11 +20,11 @@ import (
 	"context"
 	"encoding/json"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -205,7 +205,7 @@ func (e *policyExternal[P, O, CR]) Observe(ctx context.Context, mg resource.Mana
 
 	cr.SetPolicyScope(scope)
 	e.d.Report(cr, observed)
-	cr.SetConditions(xpv1.Available())
+	cr.SetConditions(xpv2.Available())
 
 	// A scope always has a policy - its own, or the one it inherits - so an
 	// inherited policy is reported as existing. Reporting it as absent would
@@ -243,7 +243,7 @@ func (e *policyExternal[P, O, CR]) Create(ctx context.Context, mg resource.Manag
 		return managed.ExternalCreation{}, errors.Errorf("managed resource is not a %s", e.d.Kind())
 	}
 
-	cr.SetConditions(xpv1.Creating())
+	cr.SetConditions(xpv2.Creating())
 
 	scope, err := e.d.Scope(ctx, e.kube, cr)
 	if err != nil {
@@ -288,7 +288,7 @@ func (e *policyExternal[P, O, CR]) Delete(ctx context.Context, mg resource.Manag
 		return managed.ExternalDelete{}, errors.Errorf("managed resource is not a %s", e.d.Kind())
 	}
 
-	cr.SetConditions(xpv1.Deleting())
+	cr.SetConditions(xpv2.Deleting())
 
 	// Deleting a policy means putting the scope back the way it was. A
 	// terminating object must not follow a reference that has since moved: it

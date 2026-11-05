@@ -21,8 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -59,7 +58,7 @@ type ServiceAccountAuth struct {
 	// `{"type":"serviceaccount","keyId":"...","key":"-----BEGIN RSA PRIVATE KEY-----..."}`.
 	// The service account must use the "Jwt" access token type.
 	// +kubebuilder:validation:Required
-	KeySecretRef xpv1.LocalSecretKeySelector `json:"keySecretRef"`
+	KeySecretRef xpv2.LocalSecretKeySelector `json:"keySecretRef"`
 }
 
 // TokenAuth holds a Zitadel Personal Access Token (PAT).
@@ -67,7 +66,7 @@ type TokenAuth struct {
 	// TokenSecretRef references the secret key holding the Personal Access
 	// Token of a Zitadel service account.
 	// +kubebuilder:validation:Required
-	TokenSecretRef xpv1.LocalSecretKeySelector `json:"tokenSecretRef"`
+	TokenSecretRef xpv2.LocalSecretKeySelector `json:"tokenSecretRef"`
 }
 
 // ZitadelCredentials contains the authentication configuration used to talk to
@@ -76,7 +75,7 @@ type ZitadelCredentials struct {
 	// Source of the provider credentials.
 	// +kubebuilder:validation:Enum=None;Secret
 	// +kubebuilder:default=Secret
-	Source xpv1.CredentialsSource `json:"source"`
+	Source xpv2.CredentialsSource `json:"source"`
 
 	// AuthType specifies which Zitadel service account credential is used.
 	// +kubebuilder:validation:Required
@@ -127,7 +126,7 @@ type ProviderConfigSpec struct {
 
 // A ProviderConfigStatus defines the status of a Provider.
 type ProviderConfigStatus struct {
-	xpv1.ProviderConfigStatus `json:",inline"`
+	xpv2.ProviderConfigStatus `json:",inline"`
 }
 
 // +kubebuilder:object:root=true
@@ -191,7 +190,7 @@ type ClusterServiceAccountAuth struct {
 	// no namespace of its own to look the secret up in, so it has to say where
 	// the secret lives.
 	// +kubebuilder:validation:Required
-	KeySecretRef xpv1.SecretKeySelector `json:"keySecretRef"`
+	KeySecretRef xpv2.SecretKeySelector `json:"keySecretRef"`
 }
 
 // ClusterTokenAuth holds a Zitadel Personal Access Token, for a cluster scoped
@@ -202,7 +201,7 @@ type ClusterTokenAuth struct {
 	//
 	// It names a namespace, for the same reason as above.
 	// +kubebuilder:validation:Required
-	TokenSecretRef xpv1.SecretKeySelector `json:"tokenSecretRef"`
+	TokenSecretRef xpv2.SecretKeySelector `json:"tokenSecretRef"`
 }
 
 // ClusterZitadelCredentials is the authentication of a cluster scoped
@@ -215,7 +214,7 @@ type ClusterZitadelCredentials struct {
 	// Source of the provider credentials.
 	// +kubebuilder:validation:Enum=None;Secret
 	// +kubebuilder:default=Secret
-	Source xpv1.CredentialsSource `json:"source"`
+	Source xpv2.CredentialsSource `json:"source"`
 
 	// AuthType specifies which Zitadel service account credential is used.
 	// +kubebuilder:validation:Required
@@ -266,7 +265,7 @@ type ClusterProviderConfigSpec struct {
 
 // A ClusterProviderConfigStatus defines the status of a ClusterProviderConfig.
 type ClusterProviderConfigStatus struct {
-	xpv1.ProviderConfigStatus `json:",inline"`
+	xpv2.ProviderConfigStatus `json:",inline"`
 }
 
 // +kubebuilder:object:root=true
