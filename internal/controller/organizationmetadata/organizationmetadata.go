@@ -21,11 +21,11 @@ import (
 	"context"
 	"encoding/json"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -119,7 +119,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	updateStatus(cr, orgID, current)
-	cr.Status.SetConditions(xpv1.Available())
+	cr.Status.SetConditions(xpv2.Available())
 
 	// Zitadel has no notion of a metadata set existing: a subject either carries
 	// keys or it carries none. Deciding existence by whether any key is present is
@@ -149,7 +149,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotOrganizationMetadata)
 	}
 
-	cr.Status.SetConditions(xpv1.Creating())
+	cr.Status.SetConditions(xpv2.Creating())
 
 	orgID, err := e.resolve(ctx, cr)
 	if err != nil {
@@ -191,7 +191,7 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotOrganizationMetadata)
 	}
 
-	cr.Status.SetConditions(xpv1.Deleting())
+	cr.Status.SetConditions(xpv2.Deleting())
 
 	if common.NeverCreated(cr.Status.AtProvider.OrganizationID) {
 		// Nothing was ever created in Zitadel, so there is nothing to detach

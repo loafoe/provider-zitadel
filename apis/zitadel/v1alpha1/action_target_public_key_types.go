@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -35,12 +34,12 @@ type ActionTargetPublicKeyParameters struct {
 	// TargetRef references an ActionTarget managed by this provider and uses its
 	// ID.
 	// +optional
-	TargetRef *xpv1.Reference `json:"targetRef,omitempty"`
+	TargetRef *xpv2.Reference `json:"targetRef,omitempty"`
 
 	// TargetSelector selects an ActionTarget managed by this provider and uses
 	// its ID.
 	// +optional
-	TargetSelector *xpv1.Selector `json:"targetSelector,omitempty"`
+	TargetSelector *xpv2.Selector `json:"targetSelector,omitempty"`
 
 	// The public key in PEM form, RSA or EC. It cannot be changed in place:
 	// Zitadel ties a key to the payload encryption of the target, so rotating one
@@ -112,8 +111,8 @@ type ActionTargetPublicKeySpec struct {
 
 // ActionTargetPublicKeyStatus is the observed state of a ActionTargetPublicKey.
 type ActionTargetPublicKeyStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          ActionTargetPublicKeyObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 ActionTargetPublicKeyObservation `json:"atProvider,omitempty"`
 }
 
 // ActionTargetPublicKeyList contains a list of ActionTargetPublicKey.

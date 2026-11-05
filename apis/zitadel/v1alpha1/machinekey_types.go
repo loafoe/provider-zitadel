@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -35,11 +34,11 @@ type MachineKeyParameters struct {
 
 	// ServiceAccountRef references a ServiceAccount managed by this provider.
 	// +optional
-	ServiceAccountRef *xpv1.Reference `json:"serviceAccountRef,omitempty"`
+	ServiceAccountRef *xpv2.Reference `json:"serviceAccountRef,omitempty"`
 
 	// ServiceAccountSelector selects a ServiceAccount managed by this provider.
 	// +optional
-	ServiceAccountSelector *xpv1.Selector `json:"serviceAccountSelector,omitempty"`
+	ServiceAccountSelector *xpv2.Selector `json:"serviceAccountSelector,omitempty"`
 
 	// ExpirationDate is when the key stops working. Defaults to one year from
 	// creation, because Zitadel requires an expiration date.
@@ -85,8 +84,8 @@ type MachineKeySpec struct {
 
 // A MachineKeyStatus represents the observed state of a MachineKey.
 type MachineKeyStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          MachineKeyObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 MachineKeyObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

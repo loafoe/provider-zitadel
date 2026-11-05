@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -215,8 +214,8 @@ type DefaultLabelPolicySpec struct {
 
 // DefaultLabelPolicyStatus is the observed state of a DefaultLabelPolicy.
 type DefaultLabelPolicyStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          DefaultLabelPolicyObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 DefaultLabelPolicyObservation `json:"atProvider,omitempty"`
 }
 
 // DefaultLabelPolicyList contains a list of DefaultLabelPolicy.

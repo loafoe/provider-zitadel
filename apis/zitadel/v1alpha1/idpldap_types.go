@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -146,8 +145,8 @@ type IDPLDAPSpec struct {
 
 // IDPLDAPStatus is the observed state of an IDPLDAP.
 type IDPLDAPStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          IDPLDAPObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 IDPLDAPObservation `json:"atProvider,omitempty"`
 }
 
 // IDPLDAPList contains a list of IDPLDAP.

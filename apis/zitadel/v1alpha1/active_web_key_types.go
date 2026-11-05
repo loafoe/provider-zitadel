@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -40,11 +39,11 @@ type ActiveWebKeyParameters struct {
 	// WebKeyRef controls the following. References a WebKey managed by this provider and uses its key
 	//
 	// +optional
-	WebKeyRef xpv1.Reference `json:"webKeyRef,omitempty"`
+	WebKeyRef xpv2.Reference `json:"webKeyRef,omitempty"`
 	// WebKeySelector controls the following. Selects a WebKey managed by this provider and uses its key
 	//
 	// +optional
-	WebKeySelector xpv1.Selector `json:"webKeySelector,omitempty"`
+	WebKeySelector xpv2.Selector `json:"webKeySelector,omitempty"`
 }
 
 // ActiveWebKeyObservation is what Zitadel reports about a Zitadel active signing key.
@@ -56,7 +55,7 @@ type ActiveWebKeyObservation struct {
 
 // ActiveWebKeyStatus reports the observed state of a Zitadel active signing key.
 type ActiveWebKeyStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
+	xpv2.ManagedResourceStatus `json:",inline"`
 
 	// AtProvider is the observed state.
 	AtProvider ActiveWebKeyObservation `json:"atProvider,omitempty"`

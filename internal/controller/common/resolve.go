@@ -24,9 +24,9 @@ import (
 	"strings"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reference"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,7 +99,7 @@ func ExtractUserID() reference.ExtractValueFn {
 // passed to the resolver so that an already created resource is not silently
 // re-pointed at a different organization by a selector that now matches more
 // than one Organization.
-func ResolveOrganizationID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv1.Reference, selector *xpv1.Selector, direct *string, providerDefault, currentValue string) (string, error) {
+func ResolveOrganizationID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv2.Reference, selector *xpv2.Selector, direct *string, providerDefault, currentValue string) (string, error) {
 	switch {
 	case ref != nil || selector != nil:
 		rsp, err := reference.NewAPIResolver(kube, mg).Resolve(ctx, reference.ResolutionRequest{
@@ -130,7 +130,7 @@ func ResolveOrganizationID(ctx context.Context, kube client.Client, mg resource.
 
 // ResolveProjectID resolves the project a managed resource belongs to from the
 // supplied projectRef, projectSelector or direct projectID.
-func ResolveProjectID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv1.Reference, selector *xpv1.Selector, direct *string, currentValue string) (string, error) {
+func ResolveProjectID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv2.Reference, selector *xpv2.Selector, direct *string, currentValue string) (string, error) {
 	if ref == nil && selector == nil {
 		if direct == nil {
 			return "", errors.Join(ErrNoProjectID, errors.New("either projectID, projectRef or projectSelector must be set"))
@@ -174,7 +174,7 @@ var userKinds = []struct {
 // A reference may point at either a HumanUser or a ServiceAccount, because both
 // kinds are Zitadel users and both can own a Personal Access Token. The
 // reference is therefore resolved against every supported kind in turn.
-func ResolveUserID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv1.Reference, selector *xpv1.Selector, direct *string, currentValue string) (string, error) {
+func ResolveUserID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv2.Reference, selector *xpv2.Selector, direct *string, currentValue string) (string, error) {
 	if ref == nil && selector == nil {
 		if direct == nil {
 			return "", errors.Join(ErrNoUserID, errors.New("either userID, userRef or userSelector must be set"))
@@ -314,7 +314,7 @@ func IsReferenceGone(err error) bool {
 // ResolveServiceAccountID resolves a reference that must point at a
 // ServiceAccount specifically, as opposed to ResolveUserID which also accepts a
 // HumanUser. A machine key, for instance, can only belong to a machine user.
-func ResolveServiceAccountID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv1.Reference, selector *xpv1.Selector, direct *string, currentValue string) (string, error) {
+func ResolveServiceAccountID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv2.Reference, selector *xpv2.Selector, direct *string, currentValue string) (string, error) {
 	if ref == nil && selector == nil {
 		if direct == nil {
 			return "", errors.Join(ErrNoUserID, errors.New("either serviceAccountID, serviceAccountRef or serviceAccountSelector must be set"))
@@ -363,7 +363,7 @@ func ResolveServiceAccountID(ctx context.Context, kube client.Client, mg resourc
 // caller that has to read a service account's keys needs both identifiers, and
 // resolving twice would be wasteful.
 func ResolveServiceAccount(ctx context.Context, kube client.Client, mg resource.ModernManaged,
-	ref *xpv1.Reference, selector *xpv1.Selector, direct *string,
+	ref *xpv2.Reference, selector *xpv2.Selector, direct *string,
 ) (serviceAccountID, orgID string, err error) {
 	if ref == nil && selector == nil {
 		if direct == nil {
@@ -490,7 +490,7 @@ func EnumValues[T ~string](values []string) []T {
 // A WebKey is an instance wide object and its identifier is the external name it
 // was created with, which is what the reference is resolved against.
 func ResolveWebKeyID(ctx context.Context, kube client.Client, mg resource.ModernManaged,
-	ref *xpv1.Reference, selector *xpv1.Selector, direct *string,
+	ref *xpv2.Reference, selector *xpv2.Selector, direct *string,
 ) (string, error) {
 	if ref == nil && selector == nil {
 		if direct == nil {
@@ -536,7 +536,7 @@ func ResolveWebKeyID(ctx context.Context, kube client.Client, mg resource.Modern
 // A reference that names neither is rejected by Zitadel, and a selector that
 // matches both kinds is reported rather than picked from.
 func ResolveApplicationID(ctx context.Context, kube client.Client, mg resource.ModernManaged,
-	ref *xpv1.Reference, selector *xpv1.Selector, direct *string,
+	ref *xpv2.Reference, selector *xpv2.Selector, direct *string,
 ) (string, error) {
 	if ref == nil && selector == nil {
 		if direct == nil {
@@ -579,8 +579,8 @@ func ResolveApplicationID(ctx context.Context, kube client.Client, mg resource.M
 
 // extractApplicationID records the identifier of one application kind, so that
 // both can be tried before deciding there is one or none.
-func extractApplicationID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv1.Reference,
-	selector *xpv1.Selector, to reference.To, out map[reflect.Type]string,
+func extractApplicationID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv2.Reference,
+	selector *xpv2.Selector, to reference.To, out map[reflect.Type]string,
 ) error {
 	extract := func(m resource.Managed) string {
 		id, ok := m.(interface{ GetApplicationID() string })
@@ -627,7 +627,7 @@ func extractApplicationID(ctx context.Context, kube client.Client, mg resource.M
 // reference is resolved against a kind rather than by pinning an ID: the
 // reference is deliberately narrow, so a key cannot be attached to a target the
 // provider does not manage.
-func ResolveTargetID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv1.Reference, selector *xpv1.Selector, direct *string) (string, error) {
+func ResolveTargetID(ctx context.Context, kube client.Client, mg resource.ModernManaged, ref *xpv2.Reference, selector *xpv2.Selector, direct *string) (string, error) {
 	if ref == nil && selector == nil {
 		if direct == nil {
 			return "", errors.Join(ErrNoUserID, errors.New("either targetID, targetRef or targetSelector must be set"))

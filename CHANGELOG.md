@@ -8,6 +8,14 @@ All notable changes to this provider are recorded here. The format follows
 
 ### Changed
 
+- **Dependency refresh, including the Crossplane v2 API types.** The API types
+  moved from `crossplane-runtime/apis/common` to `crossplane/apis/v2/core/v2`,
+  which is where Crossplane keeps them now. The provider is built against
+  `crossplane-runtime` v2.4.3, `crossplane-tools` from July 2026,
+  `controller-runtime` v0.25.2 and the `k8s.io` v0.37 libraries. Managed
+  resources gain the standard `status.lastHandledReconcileAt` field; no changes
+  to an existing manifest are needed.
+
 - **`ActionTarget` no longer copies its signing key into `status.atProvider`.**
   Zitadel returns the key on every read, but it is what lets the receiving side
   verify a payload, so a custom resource's status is not the place for it. It is

@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -37,13 +36,13 @@ type PersonalAccessTokenParameters struct {
 	// ID. Zitadel issues personal access tokens for machine users only, so a
 	// HumanUser is rejected.
 	// +optional
-	UserRef *xpv1.Reference `json:"userRef,omitempty"`
+	UserRef *xpv2.Reference `json:"userRef,omitempty"`
 
 	// UserSelector selects a ServiceAccount managed by this provider and uses
 	// its ID. Zitadel issues personal access tokens for machine users only, so a
 	// HumanUser is rejected.
 	// +optional
-	UserSelector *xpv1.Selector `json:"userSelector,omitempty"`
+	UserSelector *xpv2.Selector `json:"userSelector,omitempty"`
 
 	// ExpirationDate of the token, as an RFC3339 timestamp. Zitadel always
 	// requires an expiration date; when it is omitted the provider uses one
@@ -89,8 +88,8 @@ type PersonalAccessTokenSpec struct {
 // A PersonalAccessTokenStatus represents the observed state of a
 // PersonalAccessToken.
 type PersonalAccessTokenStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          PersonalAccessTokenObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 PersonalAccessTokenObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

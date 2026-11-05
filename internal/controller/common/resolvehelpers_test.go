@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -178,7 +178,7 @@ func TestResolveProjectID(t *testing.T) {
 
 	t.Run("Reference", func(t *testing.T) {
 		got, err := ResolveProjectID(context.Background(), kube, subject,
-			&xpv1.Reference{Name: "platform"}, nil, nil, "")
+			&xpv2.Reference{Name: "platform"}, nil, nil, "")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -214,7 +214,7 @@ func TestResolveProjectID(t *testing.T) {
 
 	t.Run("MissingReference", func(t *testing.T) {
 		if _, err := ResolveProjectID(context.Background(), kube, subject,
-			&xpv1.Reference{Name: "absent"}, nil, nil, ""); err == nil {
+			&xpv2.Reference{Name: "absent"}, nil, nil, ""); err == nil {
 			t.Error("want an error for a reference to a project that does not exist")
 		}
 	})
@@ -254,7 +254,7 @@ func TestResolveUserIDFailures(t *testing.T) {
 		// rather than the last kind's error, or the operator is told about the
 		// wrong kind of thing.
 		_, err := ResolveUserID(context.Background(), kube, subject,
-			&xpv1.Reference{Name: "absent"}, nil, nil, "")
+			&xpv2.Reference{Name: "absent"}, nil, nil, "")
 		if err == nil {
 			t.Fatal("want an error for a reference matching neither kind")
 		}
@@ -283,7 +283,7 @@ func TestResolveServiceAccountID(t *testing.T) {
 
 	t.Run("ResolvesAServiceAccount", func(t *testing.T) {
 		got, err := ResolveServiceAccountID(context.Background(), kube, subject,
-			&xpv1.Reference{Name: "robot"}, nil, nil, "")
+			&xpv2.Reference{Name: "robot"}, nil, nil, "")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -297,7 +297,7 @@ func TestResolveServiceAccountID(t *testing.T) {
 		// The two kinds are separate Kubernetes objects, so a reference to the
 		// human one does not resolve here even though it is a Zitadel user.
 		if _, err := ResolveServiceAccountID(context.Background(), kube, subject,
-			&xpv1.Reference{Name: "person"}, nil, nil, ""); err == nil {
+			&xpv2.Reference{Name: "person"}, nil, nil, ""); err == nil {
 			t.Error("a reference to a HumanUser resolved as a service account, which would attach a machine key to a human user")
 		}
 	})
@@ -344,7 +344,7 @@ func TestResolveServiceAccount(t *testing.T) {
 
 	t.Run("Reference", func(t *testing.T) {
 		id, orgID, err := ResolveServiceAccount(context.Background(), kube, subject,
-			&xpv1.Reference{Name: "robot"}, nil, nil)
+			&xpv2.Reference{Name: "robot"}, nil, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -401,7 +401,7 @@ func TestResolveWebKeyID(t *testing.T) {
 	kube := resolveKube(t, ready, notYet)
 
 	t.Run("Reference", func(t *testing.T) {
-		got, err := ResolveWebKeyID(context.Background(), kube, subject, &xpv1.Reference{Name: "signing"}, nil, nil)
+		got, err := ResolveWebKeyID(context.Background(), kube, subject, &xpv2.Reference{Name: "signing"}, nil, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -412,7 +412,7 @@ func TestResolveWebKeyID(t *testing.T) {
 	})
 
 	t.Run("NotCreatedYet", func(t *testing.T) {
-		_, err := ResolveWebKeyID(context.Background(), kube, subject, &xpv1.Reference{Name: "pending"}, nil, nil)
+		_, err := ResolveWebKeyID(context.Background(), kube, subject, &xpv2.Reference{Name: "pending"}, nil, nil)
 		if err == nil {
 			t.Fatal("want an error for a key that has no identifier yet")
 		}
@@ -460,7 +460,7 @@ func TestResolveApplicationID(t *testing.T) {
 	kube := resolveKube(t, oidc, api)
 
 	t.Run("ResolvesAnOIDCApplication", func(t *testing.T) {
-		got, err := ResolveApplicationID(context.Background(), kube, subject, &xpv1.Reference{Name: "web"}, nil, nil)
+		got, err := ResolveApplicationID(context.Background(), kube, subject, &xpv2.Reference{Name: "web"}, nil, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -471,7 +471,7 @@ func TestResolveApplicationID(t *testing.T) {
 	})
 
 	t.Run("ResolvesAnApplicationAPI", func(t *testing.T) {
-		got, err := ResolveApplicationID(context.Background(), kube, subject, &xpv1.Reference{Name: "api"}, nil, nil)
+		got, err := ResolveApplicationID(context.Background(), kube, subject, &xpv2.Reference{Name: "api"}, nil, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -483,7 +483,7 @@ func TestResolveApplicationID(t *testing.T) {
 
 	t.Run("MatchesNeither", func(t *testing.T) {
 		if _, err := ResolveApplicationID(context.Background(), kube, subject,
-			&xpv1.Reference{Name: "absent"}, nil, nil); err == nil {
+			&xpv2.Reference{Name: "absent"}, nil, nil); err == nil {
 			t.Error("want an error for a reference matching neither application kind")
 		}
 	})
@@ -531,7 +531,7 @@ func TestResolveApplicationID(t *testing.T) {
 		k := resolveKube(t, both, alsoAPI)
 
 		_, err := ResolveApplicationID(context.Background(), k, subject, nil,
-			&xpv1.Selector{MatchLabels: map[string]string{"team": "platform"}}, nil)
+			&xpv2.Selector{MatchLabels: map[string]string{"team": "platform"}}, nil)
 		if err == nil {
 			t.Fatal("want an error for a selector matching both application kinds")
 		}
@@ -556,7 +556,7 @@ func TestResolveTargetID(t *testing.T) {
 	kube := resolveKube(t, target)
 
 	t.Run("Reference", func(t *testing.T) {
-		got, err := ResolveTargetID(context.Background(), kube, subject, &xpv1.Reference{Name: "hook"}, nil, nil)
+		got, err := ResolveTargetID(context.Background(), kube, subject, &xpv2.Reference{Name: "hook"}, nil, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

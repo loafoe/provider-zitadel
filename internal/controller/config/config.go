@@ -42,7 +42,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 
 	r := providerconfig.NewReconciler(mgr, of,
 		providerconfig.WithLogger(o.Logger.WithValues("controller", name)),
-		providerconfig.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))))
+		providerconfig.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name)))) //nolint:staticcheck // crossplane-runtime uses the legacy events API
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).

@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -35,12 +34,12 @@ type UserMetadataParameters struct {
 	// UserRef references a HumanUser or ServiceAccount managed by this
 	// provider.
 	// +optional
-	UserRef *xpv1.Reference `json:"userRef,omitempty"`
+	UserRef *xpv2.Reference `json:"userRef,omitempty"`
 
 	// UserSelector selects a HumanUser or ServiceAccount managed by this
 	// provider.
 	// +optional
-	UserSelector *xpv1.Selector `json:"userSelector,omitempty"`
+	UserSelector *xpv2.Selector `json:"userSelector,omitempty"`
 
 	// Metadata is the complete set of metadata keys of the user. Zitadel
 	// replaces the set rather than merging into it, so this resource owns the
@@ -59,12 +58,12 @@ type UserMetadataObservation struct {
 	// UserRef references a HumanUser or ServiceAccount managed by this
 	// provider.
 	// +optional
-	UserRef *xpv1.Reference `json:"userRef,omitempty"`
+	UserRef *xpv2.Reference `json:"userRef,omitempty"`
 
 	// UserSelector selects a HumanUser or ServiceAccount managed by this
 	// provider.
 	// +optional
-	UserSelector *xpv1.Selector `json:"userSelector,omitempty"`
+	UserSelector *xpv2.Selector `json:"userSelector,omitempty"`
 
 	// Metadata is the metadata set Zitadel currently holds.
 	// +optional
@@ -79,8 +78,8 @@ type UserMetadataSpec struct {
 
 // A UserMetadataStatus represents the observed state of a UserMetadata.
 type UserMetadataStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          UserMetadataObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 UserMetadataObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -56,12 +55,12 @@ type OrgIDPJWTParameters struct {
 	// OrganizationRef references an Organization managed by this provider and
 	// uses its ID.
 	// +optional
-	OrganizationRef *xpv1.Reference `json:"organizationRef,omitempty"`
+	OrganizationRef *xpv2.Reference `json:"organizationRef,omitempty"`
 
 	// OrganizationSelector selects an Organization managed by this provider and
 	// uses its ID.
 	// +optional
-	OrganizationSelector *xpv1.Selector `json:"organizationSelector,omitempty"`
+	OrganizationSelector *xpv2.Selector `json:"organizationSelector,omitempty"`
 
 	// Name of the provider, as it appears on the login page.
 	// +optional
@@ -137,8 +136,8 @@ type OrgIDPJWTSpec struct {
 
 // OrgIDPJWTStatus is the observed state of an OrgIDPJWT.
 type OrgIDPJWTStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          OrgIDPJWTObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 OrgIDPJWTObservation `json:"atProvider,omitempty"`
 }
 
 // OrgIDPJWTList contains a list of OrgIDPJWT.
@@ -189,11 +188,11 @@ func (mg *OrgIDPJWT) IDPOrganization() string { return Deref(mg.Status.AtProvide
 
 // GetOrganizationRef returns the reference the provider's organization is
 // resolved from.
-func (mg *OrgIDPJWT) GetOrganizationRef() *xpv1.Reference { return mg.Spec.ForProvider.OrganizationRef }
+func (mg *OrgIDPJWT) GetOrganizationRef() *xpv2.Reference { return mg.Spec.ForProvider.OrganizationRef }
 
 // GetOrganizationSelector returns the selector the provider's organization
 // is resolved from.
-func (mg *OrgIDPJWT) GetOrganizationSelector() *xpv1.Selector {
+func (mg *OrgIDPJWT) GetOrganizationSelector() *xpv2.Selector {
 	return mg.Spec.ForProvider.OrganizationSelector
 }
 

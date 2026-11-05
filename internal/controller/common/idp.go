@@ -19,11 +19,11 @@ package common
 import (
 	"context"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -168,7 +168,7 @@ func (e *idpExternal[CR]) Observe(ctx context.Context, mg resource.Managed) (man
 	// claiming otherwise would mean reporting a provider as gone the moment after
 	// it was made.
 	if !e.d.Observable() {
-		cr.SetConditions(xpv1.Available())
+		cr.SetConditions(xpv2.Available())
 
 		return managed.ExternalObservation{ResourceExists: true, ResourceUpToDate: true}, nil
 	}
@@ -191,7 +191,7 @@ func (e *idpExternal[CR]) Observe(ctx context.Context, mg resource.Managed) (man
 	}
 
 	e.d.Report(out, *p)
-	cr.SetConditions(xpv1.Available())
+	cr.SetConditions(xpv2.Available())
 
 	return managed.ExternalObservation{
 		ResourceExists:   true,
@@ -205,7 +205,7 @@ func (e *idpExternal[CR]) Create(ctx context.Context, mg resource.Managed) (mana
 		return managed.ExternalCreation{}, errors.Errorf("managed resource is not a %s", e.d.Kind())
 	}
 
-	cr.SetConditions(xpv1.Creating())
+	cr.SetConditions(xpv2.Creating())
 
 	orgID, err := e.scope(ctx, cr)
 	if err != nil {
@@ -294,7 +294,7 @@ func (e *idpExternal[CR]) Delete(ctx context.Context, mg resource.Managed) (mana
 		return managed.ExternalDelete{}, errors.Errorf("managed resource is not a %s", e.d.Kind())
 	}
 
-	cr.SetConditions(xpv1.Deleting())
+	cr.SetConditions(xpv2.Deleting())
 
 	id := meta.GetExternalName(cr)
 	if id == "" {
@@ -356,8 +356,8 @@ func (e *idpExternal[CR]) scope(ctx context.Context, cr CR) (string, error) {
 // IDPScoped is how a scoped identity provider exposes the reference its scope is
 // resolved from, and the organization it was last read from.
 type IDPScoped interface {
-	GetOrganizationRef() *xpv1.Reference
-	GetOrganizationSelector() *xpv1.Selector
+	GetOrganizationRef() *xpv2.Reference
+	GetOrganizationSelector() *xpv2.Selector
 	GetOrganizationID() *string
 	GetObservedOrganization() *string
 }

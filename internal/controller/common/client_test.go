@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -107,11 +107,11 @@ func namespacedPC(namespace, name string, orgID *string) *apisv1alpha1.ProviderC
 			URL:            "https://zitadel.example.com",
 			OrganizationID: orgID,
 			Credentials: apisv1alpha1.ZitadelCredentials{
-				Source:   xpv1.CredentialsSourceSecret,
+				Source:   xpv2.CredentialsSourceSecret,
 				AuthType: apisv1alpha1.AuthTypeToken,
 				Token: &apisv1alpha1.TokenAuth{
-					TokenSecretRef: xpv1.LocalSecretKeySelector{
-						LocalSecretReference: xpv1.LocalSecretReference{Name: testSecret},
+					TokenSecretRef: xpv2.LocalSecretKeySelector{
+						LocalSecretReference: xpv2.LocalSecretReference{Name: testSecret},
 						Key:                  testKey,
 					},
 				},
@@ -129,11 +129,11 @@ func clusterPC(name string, orgID *string) *apisv1alpha1.ClusterProviderConfig {
 			URL:            "https://zitadel.example.com",
 			OrganizationID: orgID,
 			Credentials: apisv1alpha1.ClusterZitadelCredentials{
-				Source:   xpv1.CredentialsSourceSecret,
+				Source:   xpv2.CredentialsSourceSecret,
 				AuthType: apisv1alpha1.AuthTypeToken,
 				Token: &apisv1alpha1.ClusterTokenAuth{
-					TokenSecretRef: xpv1.SecretKeySelector{
-						SecretReference: xpv1.SecretReference{Name: testSecret, Namespace: testOrg},
+					TokenSecretRef: xpv2.SecretKeySelector{
+						SecretReference: xpv2.SecretReference{Name: testSecret, Namespace: testOrg},
 						Key:             testKey,
 					},
 				},
@@ -146,7 +146,7 @@ func clusterPC(name string, orgID *string) *apisv1alpha1.ClusterProviderConfig {
 // kind.
 func withRef(cr *v1alpha1.LockoutPolicy, kind, name string) *v1alpha1.LockoutPolicy {
 	cr.Namespace = testOrg
-	cr.Spec.ProviderConfigReference = &xpv1.ProviderConfigReference{Name: name, Kind: kind}
+	cr.Spec.ProviderConfigReference = &xpv2.ProviderConfigReference{Name: name, Kind: kind}
 
 	return cr
 }

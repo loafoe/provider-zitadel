@@ -19,11 +19,11 @@ package common
 import (
 	"context"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -175,7 +175,7 @@ func (e *namedExternal[CR]) Observe(ctx context.Context, mg resource.Managed) (m
 
 	if exists {
 		cr.NamedSetScope(scope)
-		cr.SetConditions(xpv1.Available())
+		cr.SetConditions(xpv2.Available())
 	}
 
 	return managed.ExternalObservation{ResourceExists: exists, ResourceUpToDate: exists}, nil
@@ -187,7 +187,7 @@ func (e *namedExternal[CR]) Create(ctx context.Context, mg resource.Managed) (ma
 		return managed.ExternalCreation{}, errors.Errorf("managed resource is not a %s", e.d.Kind())
 	}
 
-	cr.SetConditions(xpv1.Creating())
+	cr.SetConditions(xpv2.Creating())
 
 	scope, err := e.d.Scope(ctx, e.kube, cr)
 	if err != nil {
@@ -219,7 +219,7 @@ func (e *namedExternal[CR]) Delete(ctx context.Context, mg resource.Managed) (ma
 		return managed.ExternalDelete{}, errors.Errorf("managed resource is not a %s", e.d.Kind())
 	}
 
-	cr.SetConditions(xpv1.Deleting())
+	cr.SetConditions(xpv2.Deleting())
 
 	// A terminating object must not follow a reference that has since moved: it
 	// exists to undo what it did, so it removes the entry from the scope it

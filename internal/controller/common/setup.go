@@ -159,7 +159,7 @@ func SetupManagedResourceController(mgr ctrl.Manager, o controller.Options, grou
 		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithPollInterval(o.PollInterval),
-		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
+		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))), //nolint:staticcheck // crossplane-runtime uses the legacy events API
 	}
 
 	if o.Features.Enabled(feature.EnableBetaManagementPolicies) {

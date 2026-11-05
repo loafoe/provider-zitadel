@@ -20,11 +20,11 @@ package usergrant
 import (
 	"context"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/resource"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -146,7 +146,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	updateStatus(cr, orgID, g)
-	cr.Status.SetConditions(xpv1.Available())
+	cr.Status.SetConditions(xpv2.Available())
 
 	return managed.ExternalObservation{
 		ResourceExists:    true,
@@ -162,7 +162,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotUserGrant)
 	}
 
-	cr.Status.SetConditions(xpv1.Creating())
+	cr.Status.SetConditions(xpv2.Creating())
 
 	orgID, projectID, userID, err := e.resolve(ctx, cr)
 	if err != nil {
@@ -227,7 +227,7 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalDelete{}, errors.New(errNotUserGrant)
 	}
 
-	cr.Status.SetConditions(xpv1.Deleting())
+	cr.Status.SetConditions(xpv2.Deleting())
 
 	if common.NeverCreated(cr.Status.AtProvider.OrganizationID,
 		cr.Status.AtProvider.ProjectID, cr.Status.AtProvider.UserID, cr.Status.AtProvider.GrantID) {

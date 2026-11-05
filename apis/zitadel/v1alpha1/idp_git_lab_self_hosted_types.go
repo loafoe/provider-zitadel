@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -115,8 +114,8 @@ type IDPGitLabSelfHostedSpec struct {
 
 // IDPGitLabSelfHostedStatus is the observed state of an IDPGitLabSelfHosted.
 type IDPGitLabSelfHostedStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          IDPGitLabSelfHostedObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 IDPGitLabSelfHostedObservation `json:"atProvider,omitempty"`
 }
 
 // IDPGitLabSelfHostedList contains a list of IDPGitLabSelfHosted.

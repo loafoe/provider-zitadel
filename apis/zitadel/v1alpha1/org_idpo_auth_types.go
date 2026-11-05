@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -63,12 +62,12 @@ type OrgIDPOAuthParameters struct {
 	// OrganizationRef references an Organization managed by this provider and
 	// uses its ID.
 	// +optional
-	OrganizationRef *xpv1.Reference `json:"organizationRef,omitempty"`
+	OrganizationRef *xpv2.Reference `json:"organizationRef,omitempty"`
 
 	// OrganizationSelector selects an Organization managed by this provider and
 	// uses its ID.
 	// +optional
-	OrganizationSelector *xpv1.Selector `json:"organizationSelector,omitempty"`
+	OrganizationSelector *xpv2.Selector `json:"organizationSelector,omitempty"`
 
 	// Name of the provider, as it appears on the login page.
 	// +optional
@@ -148,8 +147,8 @@ type OrgIDPOAuthSpec struct {
 
 // OrgIDPOAuthStatus is the observed state of an OrgIDPOAuth.
 type OrgIDPOAuthStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          OrgIDPOAuthObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 OrgIDPOAuthObservation `json:"atProvider,omitempty"`
 }
 
 // OrgIDPOAuthList contains a list of OrgIDPOAuth.
@@ -202,13 +201,13 @@ func (mg *OrgIDPOAuth) IDPOrganization() string { return Deref(mg.Status.AtProvi
 
 // GetOrganizationRef returns the reference the provider's organization is
 // resolved from.
-func (mg *OrgIDPOAuth) GetOrganizationRef() *xpv1.Reference {
+func (mg *OrgIDPOAuth) GetOrganizationRef() *xpv2.Reference {
 	return mg.Spec.ForProvider.OrganizationRef
 }
 
 // GetOrganizationSelector returns the selector the provider's organization
 // is resolved from.
-func (mg *OrgIDPOAuth) GetOrganizationSelector() *xpv1.Selector {
+func (mg *OrgIDPOAuth) GetOrganizationSelector() *xpv2.Selector {
 	return mg.Spec.ForProvider.OrganizationSelector
 }
 

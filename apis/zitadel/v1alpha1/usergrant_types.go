@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -35,12 +34,12 @@ type UserGrantParameters struct {
 	// UserRef references a HumanUser or ServiceAccount managed by this
 	// provider.
 	// +optional
-	UserRef *xpv1.Reference `json:"userRef,omitempty"`
+	UserRef *xpv2.Reference `json:"userRef,omitempty"`
 
 	// UserSelector selects a HumanUser or ServiceAccount managed by this
 	// provider.
 	// +optional
-	UserSelector *xpv1.Selector `json:"userSelector,omitempty"`
+	UserSelector *xpv2.Selector `json:"userSelector,omitempty"`
 
 	// OrganizationID is the ID of the organization. Either `organizationID`,
 	// `organizationRef` or `organizationSelector` must be set.
@@ -49,11 +48,11 @@ type UserGrantParameters struct {
 
 	// OrganizationRef references an Organization managed by this provider.
 	// +optional
-	OrganizationRef *xpv1.Reference `json:"organizationRef,omitempty"`
+	OrganizationRef *xpv2.Reference `json:"organizationRef,omitempty"`
 
 	// OrganizationSelector selects an Organization managed by this provider.
 	// +optional
-	OrganizationSelector *xpv1.Selector `json:"organizationSelector,omitempty"`
+	OrganizationSelector *xpv2.Selector `json:"organizationSelector,omitempty"`
 
 	// ProjectID is the ID of the project. Either `projectID`, `projectRef` or
 	// `projectSelector` must be set.
@@ -62,11 +61,11 @@ type UserGrantParameters struct {
 
 	// ProjectRef references a Project managed by this provider.
 	// +optional
-	ProjectRef *xpv1.Reference `json:"projectRef,omitempty"`
+	ProjectRef *xpv2.Reference `json:"projectRef,omitempty"`
 
 	// ProjectSelector selects a Project managed by this provider.
 	// +optional
-	ProjectSelector *xpv1.Selector `json:"projectSelector,omitempty"`
+	ProjectSelector *xpv2.Selector `json:"projectSelector,omitempty"`
 
 	// ProjectGrantID is the ID of the project grant the roles are granted on.
 	// Leave empty to grant roles on a project of the user's own organization.
@@ -93,12 +92,12 @@ type UserGrantObservation struct {
 	// UserRef references a HumanUser or ServiceAccount managed by this
 	// provider.
 	// +optional
-	UserRef *xpv1.Reference `json:"userRef,omitempty"`
+	UserRef *xpv2.Reference `json:"userRef,omitempty"`
 
 	// UserSelector selects a HumanUser or ServiceAccount managed by this
 	// provider.
 	// +optional
-	UserSelector *xpv1.Selector `json:"userSelector,omitempty"`
+	UserSelector *xpv2.Selector `json:"userSelector,omitempty"`
 
 	// GrantID is the ID of the grant in Zitadel.
 	// +optional
@@ -133,8 +132,8 @@ type UserGrantSpec struct {
 
 // A UserGrantStatus represents the observed state of a UserGrant.
 type UserGrantStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
-	AtProvider          UserGrantObservation `json:"atProvider,omitempty"`
+	xpv2.ManagedResourceStatus `json:",inline"`
+	AtProvider                 UserGrantObservation `json:"atProvider,omitempty"`
 }
 
 // +kubebuilder:object:root=true

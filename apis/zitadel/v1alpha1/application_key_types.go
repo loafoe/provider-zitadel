@@ -19,8 +19,7 @@ package v1alpha1
 import (
 	"reflect"
 
-	xpv1 "github.com/crossplane/crossplane-runtime/v2/apis/common/v1"
-	xpv2 "github.com/crossplane/crossplane-runtime/v2/apis/common/v2"
+	xpv2 "github.com/crossplane/crossplane/apis/v2/core/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -44,13 +43,13 @@ type ApplicationKeyParameters struct {
 	// uses its ID.
 	//
 	// +optional
-	OrganizationRef *xpv1.Reference `json:"organizationRef,omitempty"`
+	OrganizationRef *xpv2.Reference `json:"organizationRef,omitempty"`
 
 	// OrganizationSelector selects an Organization managed by this provider and
 	// uses its ID.
 	//
 	// +optional
-	OrganizationSelector *xpv1.Selector `json:"organizationSelector,omitempty"`
+	OrganizationSelector *xpv2.Selector `json:"organizationSelector,omitempty"`
 
 	// ProjectID is the ID of the project the resource belongs to. Either
 	// `projectID`, `projectRef` or `projectSelector` must be set.
@@ -61,12 +60,12 @@ type ApplicationKeyParameters struct {
 	// ProjectRef references a Project managed by this provider and uses its ID.
 	//
 	// +optional
-	ProjectRef *xpv1.Reference `json:"projectRef,omitempty"`
+	ProjectRef *xpv2.Reference `json:"projectRef,omitempty"`
 
 	// ProjectSelector selects a Project managed by this provider and uses its ID.
 	//
 	// +optional
-	ProjectSelector *xpv1.Selector `json:"projectSelector,omitempty"`
+	ProjectSelector *xpv2.Selector `json:"projectSelector,omitempty"`
 
 	// ExpirationDate controls the following. When the key stops working, as a duration from now such as `8760h`. Empty means it does not expire. Zitadel returns the private half once, at creation, and never again
 	//
@@ -83,13 +82,13 @@ type ApplicationKeyParameters struct {
 	// this provider and uses its ID.
 	//
 	// +optional
-	ApplicationRef *xpv1.Reference `json:"applicationRef,omitempty"`
+	ApplicationRef *xpv2.Reference `json:"applicationRef,omitempty"`
 
 	// ApplicationSelector selects an OIDCApplication or ApplicationAPI managed by
 	// this provider and uses its ID.
 	//
 	// +optional
-	ApplicationSelector *xpv1.Selector `json:"applicationSelector,omitempty"`
+	ApplicationSelector *xpv2.Selector `json:"applicationSelector,omitempty"`
 }
 
 // ApplicationKeyObservation is what Zitadel reports about an application key.
@@ -103,7 +102,7 @@ type ApplicationKeyObservation struct {
 
 // ApplicationKeyStatus reports the observed state of a hold the key an application authenticates itself with.
 type ApplicationKeyStatus struct {
-	xpv1.ResourceStatus `json:",inline"`
+	xpv2.ManagedResourceStatus `json:",inline"`
 
 	// AtProvider is the observed state.
 	AtProvider ApplicationKeyObservation `json:"atProvider,omitempty"`
