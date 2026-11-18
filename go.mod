@@ -12,7 +12,7 @@ require (
 	github.com/crossplane/crossplane/apis/v2 v2.4.3
 	github.com/google/go-cmp v0.7.0
 	github.com/pkg/errors v0.9.1
-	github.com/zitadel/zitadel-go/v3 v3.30.0
+	github.com/zitadel/zitadel-go/v3 v3.30.1
 	golang.org/x/oauth2 v0.38.0
 	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
