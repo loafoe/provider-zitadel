@@ -17,7 +17,13 @@ limitations under the License.
 package projectrole
 
 import (
+	"context"
+	"net"
 	"testing"
+
+	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
+	projectv2 "github.com/zitadel/zitadel-go/v3/pkg/client/zitadel/project/v2"
+	"google.golang.org/grpc"
 
 	"github.com/loafoe/provider-zitadel/apis/zitadel/v1alpha1"
 	"github.com/loafoe/provider-zitadel/internal/clients/zitadel"
@@ -82,7 +88,7 @@ func TestIsUpToDate(t *testing.T) {
 func TestUpdateStatus(t *testing.T) {
 	cr := &v1alpha1.ProjectRole{}
 
-	updateStatus(cr, &zitadel.ProjectRole{
+	updateStatus(cr, "p1", &zitadel.ProjectRole{
 		Key:          testRoleKey,
 		DisplayName:  testRoleName,
 		Group:        "Billing",
@@ -97,6 +103,113 @@ func TestUpdateStatus(t *testing.T) {
 	}
 	if cr.Status.AtProvider.CreationDate == nil {
 		t.Error("creationDate: want a timestamp, got nil")
+	}
+	// Delete addresses the role by project+key and checks this field to decide
+	// whether the role was ever created, so it has to be populated on every
+	// observation.
+	if got := common.Deref(cr.Status.AtProvider.ProjectID); got != "p1" {
+		t.Errorf("projectID: want %q, got %q", "p1", got)
+	}
+}
+
+// fakeProjectService records the project roles it is asked to remove, so a
+// test can tell whether Delete actually reached the API.
+type fakeProjectService struct {
+	projectv2.UnimplementedProjectServiceServer
+
+	removed []string
+}
+
+func (f *fakeProjectService) RemoveProjectRole(_ context.Context, req *projectv2.RemoveProjectRoleRequest) (*projectv2.RemoveProjectRoleResponse, error) {
+	f.removed = append(f.removed, req.GetProjectId()+"/"+req.GetRoleKey())
+
+	return &projectv2.RemoveProjectRoleResponse{}, nil
+}
+
+// fakeExternal returns an external whose client talks to an in-process Zitadel
+// that records RemoveProjectRole calls.
+func fakeExternal(t *testing.T) (*external, *fakeProjectService) {
+	t.Helper()
+
+	var lc net.ListenConfig
+
+	lis, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("cannot listen: %v", err)
+	}
+
+	fake := &fakeProjectService{}
+	srv := grpc.NewServer()
+	projectv2.RegisterProjectServiceServer(srv, fake)
+
+	go func() { _ = srv.Serve(lis) }()
+	t.Cleanup(srv.Stop)
+
+	zc, err := zitadel.NewClient(context.Background(), zitadel.Config{
+		URL:         "http://" + lis.Addr().String(),
+		Insecure:    true,
+		Credentials: zitadel.Credentials{Token: "a-personal-access-token"},
+	})
+	if err != nil {
+		t.Fatalf("cannot build a client for the fake: %v", err)
+	}
+
+	return &external{client: zc}, fake
+}
+
+// TestDeleteRemovesRole is the regression test for the bug where every
+// ProjectRole was treated as "never created": Delete returned success without
+// calling Zitadel, so deleting the MR left the role behind.
+func TestDeleteRemovesRole(t *testing.T) {
+	cases := map[string]struct {
+		reason       string
+		statusID     *string
+		externalName string
+		wantRemoved  []string
+	}{
+		"FromStatus": {
+			reason:       "The project id in status addresses the role",
+			statusID:     ptr("p1"),
+			externalName: "p1/reader",
+			wantRemoved:  []string{"p1/reader"},
+		},
+		"FromExternalName": {
+			reason: "An object written before ProjectID was recorded still has " +
+				"the project in its external name",
+			externalName: "p1/reader",
+			wantRemoved:  []string{"p1/reader"},
+		},
+		"NeverCreated": {
+			reason:      "Nothing was created, so there is nothing to remove",
+			wantRemoved: nil,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e, fake := fakeExternal(t)
+
+			cr := &v1alpha1.ProjectRole{Spec: v1alpha1.ProjectRoleSpec{
+				ForProvider: v1alpha1.ProjectRoleParameters{Key: testRoleKey},
+			}}
+			cr.Status.AtProvider.ProjectID = tc.statusID
+			if tc.externalName != "" {
+				meta.SetExternalName(cr, tc.externalName)
+			}
+
+			if _, err := e.Delete(context.Background(), cr); err != nil {
+				t.Fatalf("\n%s\nDelete(...): unexpected error: %v", tc.reason, err)
+			}
+
+			if len(fake.removed) != len(tc.wantRemoved) {
+				t.Fatalf("\n%s\nremoved: want %v, got %v", tc.reason, tc.wantRemoved, fake.removed)
+			}
+			for i := range tc.wantRemoved {
+				if fake.removed[i] != tc.wantRemoved[i] {
+					t.Errorf("\n%s\nremoved[%d]: want %q, got %q", tc.reason, i, tc.wantRemoved[i], fake.removed[i])
+				}
+			}
+		})
 	}
 }
 

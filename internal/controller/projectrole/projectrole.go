@@ -20,6 +20,7 @@ package projectrole
 
 import (
 	"context"
+	"strings"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/meta"
@@ -104,7 +105,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 
 	_ = externalName
 
-	updateStatus(cr, r)
+	updateStatus(cr, projectID, r)
 	cr.Status.SetConditions(xpv2.Available())
 
 	return managed.ExternalObservation{
@@ -137,6 +138,12 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	meta.SetExternalName(cr, externalNameFor(projectID, fp.Key))
+	// Record the owning project in the status. Delete uses it to address the
+	// role, and a role is addressed by project+key rather than by an id of its
+	// own, so there is nothing else to recover it from. Leaving it unset made
+	// Delete's NeverCreated check treat every role as never created and skip
+	// the API call, orphaning the role in Zitadel.
+	cr.Status.AtProvider.ProjectID = common.StringPtr(projectID)
 
 	return managed.ExternalCreation{}, nil
 }
@@ -174,19 +181,39 @@ func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	cr.Status.SetConditions(xpv2.Deleting())
 
-	if common.NeverCreated(cr.Status.AtProvider.ProjectID) {
+	projectID := common.Deref(cr.Status.AtProvider.ProjectID)
+	externalName := meta.GetExternalName(cr)
+
+	if projectID == "" {
+		// The status was written by a provider that did not record ProjectID
+		// (anything before this fix). The external name is still
+		// "<projectID>/<key>", because Create and Observe have always set it
+		// that way, so recover the project from there.
+		if id, _, ok := strings.Cut(externalName, "/"); ok {
+			projectID = id
+		}
+	}
+
+	if projectID == "" {
+		// Last resort: resolve the project reference from the spec.
+		id, err := e.projectID(ctx, cr)
+		if err != nil {
+			// The project cannot be addressed right now. Let the finalizer go
+			// rather than wedge the object; the role's external name still
+			// identifies it for manual cleanup.
+			return managed.ExternalDelete{}, nil //nolint:nilerr // see the comment above
+		}
+		projectID = id
+	}
+
+	if projectID == "" || externalName == "" {
 		// Nothing was ever created in Zitadel, so there is nothing to detach
 		// from. Returning success lets the finalizer go instead of leaving the
 		// object stuck.
 		return managed.ExternalDelete{}, nil
 	}
 
-	if meta.GetExternalName(cr) == "" {
-		return managed.ExternalDelete{}, nil
-	}
-
-	if err := e.client.RemoveProjectRole(ctx,
-		common.Deref(cr.Status.AtProvider.ProjectID), cr.Spec.ForProvider.Key); err != nil {
+	if err := e.client.RemoveProjectRole(ctx, projectID, cr.Spec.ForProvider.Key); err != nil {
 		return managed.ExternalDelete{}, errors.Wrap(err, "cannot remove project role from Zitadel")
 	}
 
@@ -222,7 +249,12 @@ func externalNameFor(projectID, key string) string {
 }
 
 // updateStatus copies the observed state of r into the status of cr.
-func updateStatus(cr *v1alpha1.ProjectRole, r *zitadel.ProjectRole) {
+//
+// projectID is passed in because a Zitadel role has no id of its own: it is
+// addressed by its project and key, and the API's role object carries neither
+// the project id nor anything else Delete could recover it from.
+func updateStatus(cr *v1alpha1.ProjectRole, projectID string, r *zitadel.ProjectRole) {
+	cr.Status.AtProvider.ProjectID = common.StringPtr(projectID)
 	cr.Status.AtProvider.Key = common.StringPtr(r.Key)
 	cr.Status.AtProvider.DisplayName = common.StringPtr(r.DisplayName)
 	cr.Status.AtProvider.Group = common.StringPtr(r.Group)
