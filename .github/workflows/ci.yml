@@ -282,6 +282,11 @@ jobs:
 
       - name: Publish Artifacts to GHCR
         id: publish
+        # Pull requests build under a ref like "47/merge", which never matches
+        # RELEASE_BRANCH_FILTER: `make publish` would succeed without pushing
+        # anything, and the verification below would then fail on images that
+        # do not exist. Only pushes to a release branch publish.
+        if: github.event_name != 'pull_request'
         continue-on-error: true
         run: make publish BRANCH_NAME=${GITHUB_REF##*/}
         env:
